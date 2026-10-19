@@ -4,7 +4,7 @@
 <script>
 // 반드시 아래 두 설정값을 실제 값으로 수정하세요.
 const GOOGLE_CLIENT_ID='694588672504-0kogumff80pum5iu07eebrili8kmec1h.apps.googleusercontent.com';
-const APPS_SCRIPT_EXEC_URL='PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+const APPS_SCRIPT_EXEC_URL='https://script.google.com/macros/s/AKfycbzRMYRuZZwaH9faZoy28G1Q9_-5ETztXSTvk4TsRusYl5amhKdEuFvLZV-WiVoEAeaAdg/exec';
 function login(resp){if(!resp.credential){document.getElementById('msg').textContent='구글 로그인 정보를 받지 못했습니다.';return;}if(!APPS_SCRIPT_EXEC_URL.startsWith('https://script.google.com/macros/s/')){document.getElementById('msg').textContent='Apps Script 배포 주소가 아직 설정되지 않았습니다.';return;}document.getElementById('msg').textContent='구글 계정을 확인하고 있습니다...';const f=document.createElement('form');f.method='POST';f.action=APPS_SCRIPT_EXEC_URL;const i=document.createElement('input');i.type='hidden';i.name='credential';i.value=resp.credential;f.appendChild(i);document.body.appendChild(f);f.submit();}
 window.addEventListener('load',()=>{if(!GOOGLE_CLIENT_ID.endsWith('.apps.googleusercontent.com')){document.getElementById('msg').textContent='관리자가 Google 로그인 Client ID를 설정해야 합니다.';return;}google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:login,auto_select:false});google.accounts.id.renderButton(document.getElementById('googleButton'),{type:'standard',theme:'outline',size:'large',text:'signin_with',width:280});});
 </script></body></html>
