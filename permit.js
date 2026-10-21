@@ -31,7 +31,7 @@ function closePermit(){hideSheet();pm=null;if(vjob){renderVJob();$('permitCard')
 function si(id,val,dis,o){o=o||{};return '<input class="si'+(o.w?' w'+o.w:'')+'" id="'+id+'" type="'+(o.type||'text')+'" value="'+escapeText(val||'')+'" '+(dis?'disabled':'')+(o.ph?' placeholder="'+escapeText(o.ph)+'"':'')+' aria-label="'+escapeText(o.label||o.ph||id)+'">'}
 function cb(id,on,dis,kind,label){return '<label class="pc '+(kind||'sq')+'" title="'+escapeText(label||'')+'"><input type="checkbox" id="'+id+'" '+(on?'checked':'')+' '+(dis?'disabled':'')+' aria-label="'+escapeText(label||'')+'"><i aria-hidden="true"></i></label>'}
 function nc(idN,idD,x,dis,label){x=x||{};return '<span class="nc">'+cb(idN,x.need,dis,'sq',label+' 필요')+cb(idD,x.done,dis,'ci',label+' 조치 완료')+'</span>'}
-function sheetHtml(){const P=pm.permit,d=P.data||{},M=pm.mode,L=M!=='new',G=!(M==='new'||M==='progress'),[y,mo,da]=String(P.date||'').split('-');
+function sheetHtml(){const P=pm.permit,d=P.data||{},M=pm.mode,L=!(M==='new'||M==='edit'),G=!(M==='new'||M==='edit'||M==='progress'),[y,mo,da]=String(P.date||'').split('-');
  const sup=k=>pv(d.supp,k,{}),gas=d.gas||[],dur=d.during||[],cp=d.complete||{},ex=d.extend||{};
  const col=(a,b)=>PERMIT_SAFETY.slice(a,b).map(([k,l])=>'<tr><td class="it" id="ps_'+k+'">ㅇ '+escapeText(l)+'</td><td class="ck">'+cb('psn_'+k,pv(d.safety,k,{}).need,L,'sq',l+' 필요')+'</td><td class="ck">'+cb('psd_'+k,pv(d.safety,k,{}).done,L,'ci',l+' 조치')+'</td></tr>').join('');
  const suppRow=([k,l,s])=>{const x=sup(k),chk=(s.checks||[]).map(([c,cl])=>'<span class="sx" id="puc_'+k+'_'+c+'">'+escapeText(cl)+' '+nc('pucn_'+k+'_'+c,'pucd_'+k+'_'+c,pv(x.checks,c,{}),L,cl)+'</span>').join(' / ');
@@ -63,9 +63,15 @@ function sheetHtml(){const P=pm.permit,d=P.data||{},M=pm.mode,L=M!=='new',G=!(M=
  +'<td class="yl">승인자 '+(ap?'<b>'+escapeText(P.approvedBy)+'</b> <span class="stamp">승인</span><div class="muted">'+escapeText(fmtTime(P.approvedAt))+(P.approveNote?' · '+escapeText(P.approveNote):'')+'</div>':M==='staff'?'<b>'+escapeText(pm.approver?pm.approver.name:'')+'</b> <span class="muted">(승인 시 자동)</span><div>'+si('p_apNote','',false,{w:'f',ph:'승인 의견 (선택)',label:'승인 의견'})+'</div>':'<span class="muted">도급인 담당자가 제출 후 확인·승인</span>')+'</td></tr>'
  +'<tr><th class="w1">작업허가 연장</th><td>'+si('pe_date',ex.date,G,{type:'date',label:'연장일'})+' '+si('pe_from',ex.from,G,{type:'time',label:'연장 시작'})+' 부터 '+si('pe_to',ex.to,G,{type:'time',label:'연장 종료'})+' 까지 &nbsp;발급자 '+si('pe_by',ex.by,G,{w:'s',label:'연장 발급자'})+'(인)</td></tr></table></div>'}
 function showSheet(){const P=pm.permit,M=pm.mode,st=P_STATUS[P.status]||[P.status,'todo'];let o=$('psheet');if(!o){o=document.createElement('div');o.id='psheet';o.setAttribute('role','dialog');o.setAttribute('aria-modal','true');o.setAttribute('aria-label','안전작업허가서');document.body.appendChild(o)}
- const act=M==='new'?'<button class="button" type="button" onclick="issuePermitNow()">최종 제출</button>':M==='progress'?'<button class="button" type="button" onclick="savePermitProgress()">저장</button>':M==='staff'&&P.status!=='APPROVED'?'<button class="button" type="button" onclick="approvePermitNow()">승인</button>':'';
+ const canFix=(M==='progress'||M==='view')&&P.status==='ISSUED';  // 승인 전이면 업체가 수정·취소 가능
+ const act=M==='new'?'<button class="button" type="button" onclick="issuePermitNow()">최종 제출</button>'
+  :M==='edit'?'<button class="button ghost" type="button" onclick="cancelEditPermit()">수정 취소</button><button class="button" type="button" onclick="editPermitNow()">수정 제출</button>'
+  :M==='progress'?(canFix?'<button class="button ghost" type="button" onclick="startEditPermit()">내용 수정</button>':'')+'<button class="button" type="button" onclick="savePermitProgress()">저장</button>'
+  :M==='view'&&canFix?'<button class="button" type="button" onclick="startEditPermit()">내용 수정</button>':M==='staff'&&P.status!=='APPROVED'?'<button class="button" type="button" onclick="approvePermitNow()">승인</button>':'';
  o.innerHTML='<div class="pbar"><button class="button ghost" type="button" onclick="'+(M==='staff'?'backPermitList()':'closePermit()')+'">✕ 닫기</button><div class="pbt"><b>안전작업허가서</b> <span class="pill '+st[1]+'">'+escapeText(st[0])+'</span></div>'+act+'</div>'
-  +(M==='new'?'<div class="phelp">'+(pm.fromLast?escapeText(pm.fromLast)+' 허가서 내용이 채워져 있습니다. ':'')+'필요한 칸만 눌러서 채우고 <b>[최종 제출]</b>을 누르면 바로 작업할 수 있습니다. ☐ 필요한 사항 · ○ 조치 완료</div>':M==='progress'?'<div class="phelp">제출된 허가서입니다. 가스농도 측정·작업중 확인·작업완료·연장 칸만 채우고 [저장]하세요.</div>':'')
+  +(M==='new'?'<div class="phelp">'+(pm.fromLast?escapeText(pm.fromLast)+' 허가서 내용이 채워져 있습니다. ':'')+'필요한 칸만 눌러서 채우고 <b>[최종 제출]</b>을 누르면 바로 작업할 수 있습니다. ☐ 필요한 사항 · ○ 조치 완료</div>':M==='edit'?'<div class="phelp">내용을 고친 뒤 <b>[수정 제출]</b>을 누르세요. 허가번호는 그대로 유지됩니다.</div>'
+  :M==='progress'||M==='view'?'<div class="phelp">'+(M==='progress'?'제출된 허가서입니다. 가스농도 측정·작업중 확인·작업완료·연장 칸만 채우고 [저장]하세요.':'지난 허가서입니다.')
+   +(canFix?'<br>도급인 승인 전이라 고칠 수 있습니다: <b>[내용 수정]</b> 또는 <button class="linkbtn" type="button" onclick="withdrawPermitNow()">제출 취소 (허가서 삭제)</button>':P.status==='APPROVED'?'<br>도급인이 승인한 허가서는 수정·취소할 수 없습니다.':'')+'</div>':'')
   +'<div class="pwrap">'+sheetHtml()+'</div>';o.hidden=false;document.body.style.overflow='hidden';o.scrollTop=0;
  o.querySelectorAll('[id^=puo_]').forEach(x=>x.addEventListener('change',()=>x.closest('tr').classList.toggle('on',x.checked)))}
 function hideSheet(){const o=$('psheet');if(o){o.hidden=true;o.innerHTML=''}document.body.style.overflow=''}
@@ -90,6 +96,14 @@ function flagMissing(ids,text){document.querySelectorAll('.miss').forEach(x=>x.c
 async function issuePermitNow(){const d={...permitCollect(),...progressCollect()},m=permitMissing(d);if(m.length){flagMissing(m,'확인할 칸 '+m.length+'개 · 빨간 칸을 확인해 주세요 (필요 항목은 조치 완료 체크)');return}
  if(!confirm('작업허가서를 최종 제출할까요?\n제출하면 바로 작업할 수 있고, 도급인 담당자에게 승인 요청이 갑니다.\n(제출 후에는 가스측정·작업중 확인·완료·연장 칸만 고칠 수 있습니다)'))return;
  try{const r=await call('issuePermit',vjob.job.id,d);pm={mode:'progress',permit:r.permit,today:r.today};vjob.permits=[{...r.permit}].concat((vjob.permits||[]).filter(p=>p.date!==r.permit.date));showSheet();msg('제출했습니다. 작업을 시작하세요.')}catch(e){alert(e.message)}}
+/* v4.9 승인 전 수정·제출 취소 (업체) */
+function startEditPermit(){pm.prevMode=pm.mode;pm.mode='edit';showSheet()}
+function cancelEditPermit(){pm.mode=pm.prevMode||'progress';showSheet()}
+async function editPermitNow(){const d={...permitCollect(),...progressCollect()},m=permitMissing(d);if(m.length){flagMissing(m,'확인할 칸 '+m.length+'개 · 빨간 칸을 확인해 주세요');return}
+ if(!confirm('고친 내용으로 다시 제출할까요?'))return;
+ try{const r=await call('editPermit',pm.permit.id,d);pm={mode:r.permit.date===r.today?'progress':'view',permit:r.permit,today:r.today};vjob.permits=(vjob.permits||[]).map(p=>p.id===r.permit.id?{...r.permit}:p);showSheet();msg('수정 제출했습니다.')}catch(e){alert(e.message)}}
+async function withdrawPermitNow(){if(!confirm('이 허가서 제출을 취소할까요?\n허가서가 삭제되고, 오늘 허가서를 처음부터 다시 작성할 수 있습니다.'))return;
+ try{vjob=await call('withdrawPermit',pm.permit.id);hideSheet();pm=null;renderVJob();$('permitCard')?.scrollIntoView({block:'start'});msg('제출을 취소했습니다.')}catch(e){alert(e.message)}}
 async function savePermitProgress(){try{const r=await call('updatePermitProgress',pm.permit.id,progressCollect());pm.permit=r.permit;showSheet();msg('저장했습니다.');vjob.permits=(vjob.permits||[]).map(p=>p.id===r.permit.id?{...p,completed:r.permit.completed}:p)}catch(e){}}
 /* ---------- 직원: 공사별 허가서 목록 · 보기 · 승인 ---------- */
 let permitJob=null;
