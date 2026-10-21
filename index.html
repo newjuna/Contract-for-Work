@@ -24,7 +24,7 @@ h1{font-size:22px;margin:0 0 6px;font-weight:700;color:#111827}
 <script>
 const CLIENT_ID='694588672504-0kogumff80pum5iu07eebrili8kmec1h.apps.googleusercontent.com';
 // Apps Script 신규 배포 후 이 한 줄에 /exec URL을 입력하세요.
-const APPS_SCRIPT_URL='PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbzlk7IF6dxSPZFVAcCrWPVUKJbtCUJzdzh_1JDIkblk3R5sNn3t9NVMcjKtgP3PuSqgSw/exec';
 const st=document.getElementById('status');
 function loggedIn(r){if(!r.credential) return; if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(APPS_SCRIPT_URL)){st.textContent='Google 로그인은 완료되었습니다. Apps Script /exec 주소를 아직 등록하지 않았습니다.';return;} document.getElementById('entry').action=APPS_SCRIPT_URL;document.getElementById('cred').value=r.credential;document.getElementById('review').value=new URLSearchParams(location.search).get('review')||'';st.textContent='인증 정보를 확인하고 있습니다...';document.getElementById('entry').submit();}
 window.onload=()=>{if(!window.google?.accounts?.id){st.textContent='Google 로그인 라이브러리를 불러오지 못했습니다. 새로고침해 주세요.';return;} google.accounts.id.initialize({client_id:CLIENT_ID,callback:loggedIn,ux_mode:'popup'});google.accounts.id.renderButton(document.getElementById('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'});};
