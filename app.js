@@ -19,11 +19,11 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.21 v5.2';
+const UI_VERSION='26.10.21 v5.3';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;switchTab('staff')}
-function display(s){state=s;showVer(s);$('gearBtn').hidden=!s.isMaster;setTimeout(()=>{showBadges(s.badges);startBadges()},0);$('identity').textContent=(s.mode==='STAFF'?'[다이소 담당자로 접속] ':s.mode==='VENDOR'?'[협력업체로 접속] ':'')+'접속 계정: '+s.email+(s.staff?' · 아성다이소 '+s.staff.roleLabel+' '+s.staff.name:'');$('staffTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));$('jobsTab').classList.toggle('hidden',!s.staff);$('noticeTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));if(s.staff&&!s.company&&tab==='my'){$('myTab').textContent='내 업무';}$('adminTab').classList.toggle('hidden',!(['ADMIN','SAFETY'].includes(s.role)||s.isApprover));$('tplTab').classList.toggle('hidden',!['ADMIN','SAFETY'].includes(s.role));$('reviewTab').classList.toggle('hidden',!['ADMIN','SAFETY','CONTRACT'].includes(s.role));if($(tab+'Tab'))$('pageTitle').textContent=$(tab+'Tab').textContent;renderMy();}
+function display(s){state=s;showVer(s);$('gearBtn').hidden=!s.isMaster;setTimeout(()=>{showBadges(s.badges);startBadges()},0);$('identity').textContent=(s.mode==='STAFF'?'[다이소 담당자로 접속] ':s.mode==='VENDOR'?'[협력업체로 접속] ':'')+'접속 계정: '+s.email+(s.staff?' · 아성다이소 '+s.staff.roleLabel+' '+s.staff.name:'');$('staffTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));$('jobsTab').classList.toggle('hidden',!s.staff);$('noticeTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));if(s.staff&&!s.company&&tab==='my'){$('myTab').textContent='내 업무';}$('adminTab').classList.toggle('hidden',!(['ADMIN','SAFETY'].includes(s.role)||s.isApprover));$('tplTab').classList.toggle('hidden',!['ADMIN','SAFETY'].includes(s.role));$('reviewTab').classList.toggle('hidden',!['ADMIN','SAFETY','CONTRACT'].includes(s.role));if($(tab+'Tab'))$('pageTitle').textContent=$(tab+'Tab').textContent;setupVMenu();renderMy();}
 /** ☰ 메뉴 열기·닫기 */
 function toggleMenu(open){const d=$('drawer');if(!d)return;const v=open===undefined?!d.classList.contains('open'):!!open;d.classList.toggle('open',v);$('scrim').classList.toggle('open',v);d.setAttribute('aria-hidden',String(!v));$('menuBtn').setAttribute('aria-expanded',String(v));document.body.style.overflow=v?'hidden':''}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')toggleMenu(false)});
@@ -33,11 +33,11 @@ else if(b.status==='VERIFIED'){activeStep=1;html=vendorHomeHtml(b)}$('my').inner
  // 승인 대기 중일 때만 15초마다 승인 여부 자동 확인
  clearInterval(pollTimer);if(b&&b.status==='PENDING')pollTimer=setInterval(()=>checkApproval(false),15000);
  if(b&&b.status==='VERIFIED'&&['SUBMITTED','SAFETY_REVIEW'].includes(b.submissionStatus))pollTimer=setInterval(checkReview,30000);
- if(b&&b.status==='VERIFIED'&&b.submissionStatus==='APPROVED'){showApprovedOnce(b);if(vjob)renderVJob();else loadMyJobs()}}
+ if(b&&b.status==='VERIFIED'&&b.submissionStatus==='APPROVED'){showApprovedOnce(b);vStart()}}
 /* 계약 전 검토 상태 자동 확인 */
 async function checkReview(){try{const s=await callQuiet('myStatus');if(s&&s.submissionStatus!==state.company.submissionStatus){clearInterval(pollTimer);await reload();}}catch(e){}}
 /* 승인 안내 팝업: 업체당 한 번만 */
-function showApprovedOnce(b){const key='approvedSeen:'+b.id;let seen=false;try{seen=localStorage.getItem(key)==='1'}catch(e){}if(seen||window.__approvedShown)return;window.__approvedShown=true;popup('계약 전 검토가 완료되었습니다','본사 담당자와 안전보건팀 검토를 모두 통과했습니다.\n이제 수행 단계 서류(위험성평가, 안전작업계획서 등)를 휴대폰으로 바로 등록할 수 있습니다.','수행 단계 시작',()=>{try{localStorage.setItem(key,'1')}catch(e){}window.scrollTo(0,0)})}
+function showApprovedOnce(b){const key='approvedSeen:'+b.id;let seen=false;try{seen=localStorage.getItem(key)==='1'}catch(e){}if(seen||window.__approvedShown)return;window.__approvedShown=true;popup('계약 전 검토가 완료되었습니다','본사 담당자 검토를 통과했습니다.\n첫 화면에서 공사 일정과 오늘 할 일을 확인하고, ☰ 메뉴에서 작업자 등록·작업허가서·순회점검을 진행해 주세요.','시작하기',()=>{try{localStorage.setItem(key,'1')}catch(e){}window.scrollTo(0,0)})}
 /* ---------- 승인 대기 자동 확인 + 안내 팝업 ---------- */
 let pollTimer=null;
 function popup(title,body,btn,onOk,onLater){$('modalTitle').textContent=title;$('modalBody').textContent=body;$('modalBtn').textContent=btn;$('modal').style.display='flex';const c=$('modalCancel');c.hidden=!onLater;$('modalBtn').onclick=()=>{$('modal').style.display='none';onOk&&onOk()};c.onclick=()=>{$('modal').style.display='none';onLater&&onLater()};$('modalBtn').focus()}
@@ -97,7 +97,6 @@ function vendorHomeHtml(b){
 function headCard(b,st,todo,pctHtml){
  const flow=['정보·서류 작성','제출','본사 1차 검토','안전보건팀 확인','수행 단계'],cur={DRAFT:0,CORRECTION:0,SUBMITTED:2,SAFETY_REVIEW:3,APPROVED:4}[st]??0;
  return '<div class="card"><div class="vh-top"><div><h2 style="margin:0">'+escapeText(b.company)+'</h2><div class="muted">'+escapeText(b.industry)+' · 사업자번호 '+escapeText(b.regNo)+'</div></div><span class="pill '+(st==='APPROVED'?'ok':st==='CORRECTION'?'todo':'lock')+'">'+escapeText(SUB_LABEL[st]||st)+'</span></div>'
-  +'<div class="flow">'+flow.map((n,i)=>'<span class="'+(i<cur?'done':i===cur?'now':'')+'">'+(i<cur?'✔ ':'')+n+'</span>').join('')+'</div>'
   +'<div class="note" style="margin-top:12px"><b>지금 할 일</b> · '+escapeText(todo)+'</div>'+(pctHtml||'')+'</div>';
 }
 /* 문서 카드 (계약·수행 공통, 모바일 기준) */
@@ -145,7 +144,7 @@ function executionHomeHtml(b){
  const todo='배정된 공사를 눌러 [오늘 할 일]을 진행해 주세요.';
  // v3.1 공사별 오늘 할 일 (목록은 화면이 뜬 뒤 loadMyJobs로 채움)
  // v3.1.1 업체는 '내 공사'만 보이게 (기타 서류·본사 문서·계약 전 내용 보기 제거)
- return headCard(b,'APPROVED',todo,'')+'<div id="execArea"><div class="card"><p class="desc">배정된 공사를 불러오는 중입니다…</p></div></div>';
+ return '<div id="execArea"><div class="card"><p class="desc">배정된 공사를 불러오는 중입니다…</p></div></div>';
 }
 /** 누락 항목 표시: 빨간 테두리 + 흔들림, 첫 칸으로 이동 (입력하면 표시 해제) */
 function markMissing(list){document.querySelectorAll('.miss').forEach(x=>x.classList.remove('miss','shake'));let first=null;list.forEach(m=>{const el=/^doc/.test(m.key)?$('row_'+m.key):$('f_'+m.key);if(!el)return;el.classList.add('miss');void el.offsetWidth;el.classList.add('shake');if(!first)first=el;if(el.tagName==='INPUT')el.addEventListener('input',()=>el.classList.remove('miss','shake'),{once:true})});if(first){first.scrollIntoView({behavior:'smooth',block:'center'});if(first.tagName==='INPUT')setTimeout(()=>first.focus({preventScroll:true}),400)}msg('채워야 할 항목 '+list.length+'개 · 빨간 칸을 확인해 주세요')}
@@ -274,33 +273,31 @@ async function sendCheckIn(e){e.preventDefault();const info={name:value('cName')
 let vjobs=null,vjob=null,vtab='today',wkTimer=null,showQr=false,showAdd=false,workerLinkMode=false;
 const SIGN_LABEL={SELF:'✔ 본인 계정 서명',MANAGER:'✔ 소장 확인'};
 async function loadMyJobs(){const x=()=>$('execArea');try{vjobs=await callQuiet('myJobs');renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
-function renderMyJobs(){const el=$('execArea');if(!el)return;vjob=null;clearInterval(wkTimer);const d=vjobs;
- el.innerHTML='<div class="card"><h2>내 공사</h2><p class="desc">공사마다 [오늘 할 일]이 따로 있습니다. 공사를 눌러 시작하세요.</p>'+(d.jobs.map(j=>'<button class="jobitem" type="button" onclick="openVJob(\''+escapeText(j.id)+'\')"><div><b>'+escapeText(j.title)+'</b><div class="muted">'+escapeText(j.storeName)+' · '+escapeText(j.startDate)+(j.endDate?' ~ '+escapeText(j.endDate):'')+' · 도급인 '+escapeText(j.hostName)+'</div><div class="muted">작업자 '+j.workers+'명 · 오늘 인원 '+(j.todayDone?'<b style="color:var(--ok)">✔ '+j.todayCount+'명</b>':'<b style="color:var(--accent)">미체크</b>')+'</div></div><span aria-hidden="true">›</span></button>').join('')||'<div class="note">아직 배정된 공사가 없습니다.<br>도급인 담당자가 공사에 업체를 배정하면 여기에 나타납니다.</div>')+'</div>'}
+function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
 async function openVJob(id){try{vjob=await call('vendorJob',id);vtab='today';showQr=false;showAdd=false;renderVJob();window.scrollTo(0,0)}catch(e){}}
-function backJobs(){vjob=null;clearInterval(wkTimer);loadMyJobs()}
+function backJobs(){vgo('dash')}
 function setVTab(t){vtab=t;renderVJob()}
 function renderVJob(){const el=$('execArea');if(!el||!vjob)return;const v=vjob;clearInterval(wkTimer);
- const head='<div class="card"><button class="button ghost" type="button" onclick="backJobs()">← 내 공사</button><h2 style="margin-top:12px">'+escapeText(v.job.title)+'</h2><div class="muted">'+escapeText(v.job.storeName)+' · '+escapeText(v.company.trade)+' · 도급인 '+escapeText(v.job.hostName)+'</div>'
-  +'<div class="seg" role="tablist"><button type="button" role="tab" aria-selected="'+(vtab==='today')+'" class="'+(vtab==='today'?'on':'')+'" onclick="setVTab(\'today\')">오늘 할 일</button><button type="button" role="tab" aria-selected="'+(vtab==='drill')+'" class="'+(vtab==='drill'?'on':'')+'" onclick="setVTab(\'drill\')">비상대응훈련 <span class="segtag">미완료</span></button></div></div>';
- el.innerHTML=head+vEndHtml(v)+(vtab==='today'?todayHtml(v):drillHtml(v));
+ const head=vJobHead(v);
+ el.innerHTML=head+vEndHtml(v)+todayHtml(v);
  if(showQr)wkTimer=setInterval(async()=>{if(!vjob||vjob.job.id!==v.job.id||!showQr){clearInterval(wkTimer);return}try{const x=await callQuiet('vendorJob',v.job.id);if(x.workers.length!==vjob.workers.length){vjob=x;renderVJob();msg('새 작업자가 등록되었습니다.')}}catch(e){}},8000)}
 function todayHtml(v){
  const tc=v.todayCrew,inToday=new Set(tc?tc.workers.map(w=>w.id):[]);
  const qr='https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data='+encodeURIComponent(v.link);
  const method=w=>w.method==='SELF'?'본인 등록':'소장 등록';
  // ① 작업자 등록 (최초 1회 = 신규자 교육일지)
- const reg='<div class="card"><div class="vh-top"><h2 style="margin:0">① 작업자 등록</h2><span class="pill lock">처음 1회</span></div><p class="desc">처음 오는 사람만 등록합니다. 등록하면 <b>신규자 교육일지</b>와 그날 <b>작업 안전 수칙 서명</b>이 함께 처리됩니다.</p>'
+ const reg='<div class="card"><div class="vh-top"><h2 style="margin:0">작업자 등록</h2><span class="pill lock">처음 1회</span></div><p class="desc">처음 오는 사람만 등록합니다. 등록하면 <b>신규자 교육일지</b>와 그날 <b>작업 안전 수칙 서명</b>이 함께 처리됩니다.</p>'
   +'<div class="row"><button class="button" type="button" style="flex:1" onclick="toggleQr()">'+(showQr?'QR 닫기':'QR 보여주기')+'</button><button class="button ghost" type="button" style="flex:1" onclick="toggleAdd()">'+(showAdd?'직접 등록 닫기':'직접 등록 (구글계정 없는 사람)')+'</button></div>'
   +(showQr?'<div style="text-align:center;margin:16px 0 4px"><img src="'+escapeText(qr)+'" alt="작업자 등록 QR 코드" width="240" height="240" style="border:1px solid var(--line);border-radius:12px"><p class="desc">새로 온 사람이 휴대폰 카메라로 찍고 <b>본인 Google 계정</b>으로 로그인해 등록합니다.<br>등록되면 아래 명단에 자동으로 나타납니다.</p><div class="row" style="justify-content:center"><button class="button ghost" type="button" onclick="copyLink(\''+escapeText(v.link)+'\')">등록 링크 복사</button><button class="button ghost" type="button" onclick="renewQr()">QR 새로 만들기</button></div></div>':'')
   +(showAdd?'<form class="subbox" onsubmit="addWorkerForm(event)"><div class="split">'+input('wName','이름','','text',false,'예: 홍길동')+'<div class="field"><label for="f_wRole">구분</label><select id="f_wRole">'+v.roles.map(r=>'<option '+(r==='근로자'?'selected':'')+'>'+escapeText(r)+'</option>').join('')+'</select></div>'+input('wTrade','공정명 (선택)','','text',false,'예: 목공, 전기')+'</div><label class="desc"><input type="checkbox" id="wAgree"> 이 작업자에게 작업 안전 수칙 '+v.rules.length+'개 항목을 교육하고 서약을 받았습니다.</label><button class="button" type="submit" style="width:100%;margin-top:10px">작업자 등록</button><p class="muted" style="margin-top:6px">소장 등록 기록에는 "소장 등록"으로 표시되어 본인 등록과 구분됩니다.</p></form>':'')
   +'<details class="hist" style="margin-top:12px"><summary><b>등록된 작업자 '+v.workers.length+'명</b> · 교육일지 보기</summary>'+(v.workers.map(w=>'<div class="item"><div class="row" style="justify-content:space-between"><div><b>'+escapeText(w.name)+'</b> <span class="muted">'+escapeText(w.role)+(w.trade?' · '+escapeText(w.trade):'')+'</span><div class="muted">'+method(w)+' · 교육 '+escapeText(fmtTime(w.eduAt))+(w.email?' · '+escapeText(w.email):'')+'</div></div><button class="button ghost" type="button" onclick="dropWorker(\''+escapeText(w.id)+'\',\''+escapeText(w.name)+'\')">명단에서 빼기</button></div></div>').join('')||'<p class="muted">아직 등록된 작업자가 없습니다.</p>')+'</details></div>';
  // ② 오늘 작업 인원 = 그날 작업 안전 수칙 서명 (매일 1회)
- const crew='<div class="card" id="crewCard"><div class="vh-top"><h2 style="margin:0">② 오늘 작업 인원 · 안전 수칙 서명</h2>'+(tc?'<span class="pill ok">✔ '+tc.count+'명 완료</span>':'<span class="pill todo">매일 1회 · 미체크</span>')+'</div><p class="desc">'+escapeText(v.today)+' · 오늘 일하는 사람을 체크하고 저장하면, 그날 <b>작업 안전 수칙</b>에 서명한 것으로 기록됩니다.'+(tc?'<br>저장 '+escapeText(fmtTime(tc.savedAt))+' · 바뀌면 다시 저장하세요.':'')+'</p>'
-  +(v.workers.length?'<form onsubmit="saveCrewForm(event)">'+input('crewSm','현장책임자',v.siteManager,'text',false,'예: 김소장')+'<div class="row" style="justify-content:space-between;margin:6px 0"><b>작업자 명단</b><button class="linkbtn" type="button" onclick="checkAllCrew()">전체 선택</button></div>'+v.workers.map(w=>'<label class="wk"><input type="checkbox" class="crewck" value="'+escapeText(w.id)+'" '+(inToday.has(w.id)?'checked':'')+'><span><b>'+escapeText(w.name)+'</b> <span class="muted">'+escapeText(w.role)+(w.trade?' · '+escapeText(w.trade):'')+'</span></span></label>').join('')+'<button class="button" type="submit" style="width:100%;margin-top:10px">오늘 인원 저장 (수칙 서명)</button></form>':'<div class="note">먼저 ① 작업자 등록을 해 주세요.</div>')
+ const crew='<div class="card" id="crewCard"><div class="vh-top"><h2 style="margin:0">오늘 작업 인원 · 안전 수칙 서명</h2>'+(tc?'<span class="pill ok">✔ '+tc.count+'명 완료</span>':'<span class="pill todo">매일 1회 · 미체크</span>')+'</div><p class="desc">'+escapeText(v.today)+' · 오늘 일하는 사람을 체크하고 저장하면, 그날 <b>작업 안전 수칙</b>에 서명한 것으로 기록됩니다.'+(tc?'<br>저장 '+escapeText(fmtTime(tc.savedAt))+' · 바뀌면 다시 저장하세요.':'')+'</p>'
+  +(v.workers.length?'<form onsubmit="saveCrewForm(event)">'+input('crewSm','현장책임자',v.siteManager,'text',false,'예: 김소장')+'<div class="row" style="justify-content:space-between;margin:6px 0"><b>작업자 명단</b><button class="linkbtn" type="button" onclick="checkAllCrew()">전체 선택</button></div>'+v.workers.map(w=>'<label class="wk"><input type="checkbox" class="crewck" value="'+escapeText(w.id)+'" '+(inToday.has(w.id)?'checked':'')+'><span><b>'+escapeText(w.name)+'</b> <span class="muted">'+escapeText(w.role)+(w.trade?' · '+escapeText(w.trade):'')+'</span></span></label>').join('')+'<button class="button" type="submit" style="width:100%;margin-top:10px">오늘 인원 저장 (수칙 서명)</button></form>':'<div class="note">먼저 위에서 작업자 등록을 해 주세요.</div>')
   +(tc?'<button class="button ghost" type="button" style="width:100%;margin-top:8px" onclick="showRules(\''+escapeText(v.today)+'\')">오늘 작업 안전 수칙 보기</button>':'')
   +(v.history.filter(h=>h.date!==v.today).length?'<details class="hist" style="margin-top:12px"><summary>지난 기록 '+v.history.filter(h=>h.date!==v.today).length+'일</summary>'+v.history.filter(h=>h.date!==v.today).map(h=>'<div class="item"><div class="row" style="justify-content:space-between"><span>'+escapeText(h.date)+' · '+h.count+'명</span><button class="button ghost" type="button" onclick="showRules(\''+escapeText(h.date)+'\')">보기</button></div></div>').join('')+'</details>':'')+'</div>';
  const later=(t,c,m)=>'<div class="card"><div class="vh-top"><h2 style="margin:0">'+t+'</h2><span class="pill todo">'+c+'</span></div><p class="muted">'+m+'</p></div>';
- return reg+crew+permitCardHtml(v)+inspCardHtml(v);
+ return vmenu==='permit'?permitCardHtml(v):vmenu==='insp'?inspCardHtml(v):reg+crew;
 }
 function drillHtml(v){return '<div class="card"><div class="vh-top"><h2 style="margin:0">비상대응훈련</h2><span class="pill todo">공사당 1회 · 미완료</span></div><p class="desc">훈련을 실시한 뒤 결과를 한 번 등록하면 <b>완료</b>로 바뀝니다.</p><div class="note">등록 화면은 다음 단계에서 열립니다.</div></div>'}
 function toggleQr(){showQr=!showQr;renderVJob()}

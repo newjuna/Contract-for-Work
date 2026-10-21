@@ -11,7 +11,7 @@ let inspJob=null,inspFind=null;
 /* ---------- 업체: [오늘 할 일] ④ 카드 ---------- */
 function inspCardHtml(v){const I=v.insp||{open:[],recent:[]};
  const st=I.todayDone?['✔ 오늘 점검 완료','ok']:I.due?['점검 필요'+(I.since!=null?' · '+I.since+'일 경과':''),'bad']:['다음 점검 '+(2-I.since)+'일 후','todo'];
- return '<div class="card" id="inspCard"><div class="vh-top"><h2 style="margin:0">④ 순회점검</h2><span class="pill '+st[1]+'">'+escapeText(st[0])+'</span></div>'
+ return '<div class="card" id="inspCard"><div class="vh-top"><h2 style="margin:0">순회점검</h2><span class="pill '+st[1]+'">'+escapeText(st[0])+'</span></div>'
   +'<p class="desc">2일 1회 · 첫 장에 TBM 사진, 그 아래 11개 항목을 점검합니다.'+(I.last?' 마지막 점검 '+escapeText(I.last):'')+'</p>'
   +(I.todayDone?'':'<button class="button" type="button" style="width:100%" onclick="openInspForm()">오늘 순회점검 작성</button>')
   +(I.open.length?'<div class="stage">미조치 지적사항 <span class="cnt">'+I.open.length+'</span></div>'+I.open.map(f=>findRow(f,'vendor')).join(''):'')
