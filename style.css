@@ -96,3 +96,34 @@ body{background:var(--bg);color:var(--text);font:15px/1.6 "Pretendard","Malgun G
 .psw{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px}.psw input{width:20px;height:20px;accent-color:var(--main)}
 .pgas{display:grid;grid-template-columns:40px repeat(3,1fr);gap:0 8px;align-items:end;border-top:1px solid var(--line);padding-top:6px;margin-top:6px}.pgas>b{align-self:center}
 @media(max-width:650px){.split3{grid-template-columns:1fr}.pgas{grid-template-columns:1fr 1fr}.pgas>b{grid-column:1/-1}.prow{flex-direction:column;align-items:flex-start}}
+/* ===== v4.8 안전작업허가서: 종이 양식 모양 전체 화면 ===== */
+#psheet{position:fixed;inset:0;z-index:40;background:#e5e7eb;overflow:auto;-webkit-overflow-scrolling:touch}
+.pbar{position:sticky;top:0;left:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--line)}.pbt{flex:1;text-align:center;font-size:15px}
+.phelp{max-width:860px;margin:10px auto 0;padding:10px 14px;background:#fff8e6;border:1px solid #f1d58a;border-radius:10px;font-size:13px;line-height:1.6}
+.pwrap{overflow-x:auto;padding:12px}
+.sheet{width:820px;margin:0 auto 40px;background:#fff;padding:22px 20px 26px;box-shadow:0 4px 18px #0002;color:#111;font-size:12.5px;line-height:1.5}
+.sheet .st{text-align:center;font-size:22px;letter-spacing:2px;text-decoration:underline;margin:0}.sheet .ss{text-align:center;font-size:12px;margin-bottom:8px}
+.sheet .hd{display:flex;justify-content:space-between;gap:10px;padding:3px 2px;border-bottom:1px solid #999}
+.pt{width:100%;border-collapse:collapse;margin-top:-1px}.pt th,.pt td{border:1px solid #333;padding:4px 6px;vertical-align:middle}
+.pt th{background:#d9d9d9;font-weight:700;white-space:nowrap;text-align:center}.pt td{background:#fff}
+.bar{display:flex;gap:16px;align-items:center;background:#bfbfbf;border:1px solid #333;margin-top:-1px;padding:4px 8px}.bar b{min-width:250px;text-align:center}.bar span{font-size:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr}.g3 .pt{height:100%}.g3 .pt+.pt{margin-left:-1px}
+.pt td.it{font-size:12px}.pt td.ck{width:26px;text-align:center;background:#f4dcb4;padding:2px}
+.pt th.sl{width:74px;font-size:14px;letter-spacing:4px}.pt td.ck.on{background:#f4dcb4}.pt td.sc>div{margin:2px 0}.sx{display:inline-flex;align-items:center;gap:3px;flex-wrap:wrap}
+.su:not(.on) td.sc{color:#888}.su.on td.sc{background:#fffdf5}.sr{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}.sn{font-size:11px;color:#444}
+.pt.gas td{padding:2px}.pt.gas .vt{width:44px;line-height:1.3}.pt.gas .gl{font-weight:500;font-size:11.5px;background:#eee}.pt.gas .gn{text-align:center;font-size:11px;min-width:120px}
+.pt th.w1{width:110px}.ml{font-size:11px;color:#555;margin-right:3px}.at .ax{display:inline-flex;align-items:center;gap:3px;margin:2px 10px 2px 0}.pr{margin:0 4px;white-space:nowrap}
+.pt.sign td.yl{background:#ffef62;font-weight:600}.stamp{display:inline-block;border:2px solid #c62828;color:#c62828;border-radius:50%;padding:4px 6px;font-size:12px;transform:rotate(-12deg);margin-left:6px}
+/* 칸 안 입력: 밑줄 형태, 채워진 칸은 종이 양식처럼 연한 주황 */
+.si{font:inherit;font-size:12.5px;border:0;border-bottom:1px solid #777;background:#fff7ea;padding:3px 4px;min-width:60px;border-radius:0;color:#111}.si:focus{outline:2px solid #2563eb;background:#fff}
+.si.ws{width:90px}.si.wm{width:140px}.si.wl{width:240px}.si.wf{width:100%}.si[type=time]{width:96px}.si[type=date]{width:130px}.si:disabled{background:transparent;color:#111;border-bottom-color:#bbb;-webkit-text-fill-color:#111;opacity:1}
+.pt.gas .si{width:100%;min-width:0}
+/* ☐ 필요 / ○ 조치 완료 */
+.pc{position:relative;display:inline-flex;width:22px;height:22px;cursor:pointer;vertical-align:middle}.pc input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.pc i{display:block;width:18px;height:18px;margin:2px;border:1.6px solid #333;background:#fff}.pc.ci i{border-radius:50%}
+.pc input:checked+i{background:#111}.pc.sq input:checked+i::after{content:'✓';color:#fff;font-size:13px;font-style:normal;display:block;text-align:center;line-height:15px}.pc.ci input:checked+i{background:#fff;box-shadow:inset 0 0 0 4px #fff,inset 0 0 0 9px #c62828}
+.pc input:focus-visible+i{outline:2px solid #2563eb;outline-offset:1px}.pc input:disabled{cursor:default}.nc{display:inline-flex;gap:1px;margin-left:2px}
+.sheet .miss{outline:2px solid var(--accent)!important;background:#fff0f0!important}
+.toast{z-index:60}
+.pt td.dc{width:17%}.pt td.dc .ml{display:block}.pt td.dc .si{width:100%;min-width:0}
+.pt.sign{table-layout:fixed}.pt.sign td.yl{width:50%}.pt.sign th.w1{width:110px}
