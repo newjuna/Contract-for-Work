@@ -4,17 +4,19 @@
  *  공사가 여러 개면 각 메뉴 맨 위에서 공사를 고름 (1개면 자동)
  *  서버: Code.gs myJobs(stats·end) · vendorJob */
 let vmenu='dash',vSel='';
-const VMENU={dash:'대시보드',workers:'작업자 등록 · 오늘 인원',permit:'작업허가서 발행',insp:'순회점검',drill:'비상대피훈련 등록',docs:'계약 서류'};
+const VMENU={dash:'대시보드',workers:'작업자 등록 · 오늘 인원',permit:'작업허가서 발행',insp:'순회점검',meet:'협의체 및 합동점검 참여',drill:'비상대피훈련 등록',docs:'계약 서류'};
 const isVendorApproved=()=>!!(state&&!state.staff&&state.company&&state.company.status==='VERIFIED'&&state.company.submissionStatus==='APPROVED');
 /** 메뉴 버튼 보이기 (display 때마다) */
 function setupVMenu(){const ap=isVendorApproved();document.querySelectorAll('.vmb').forEach(b=>b.classList.toggle('hidden',!ap));
  $('myTab').classList.toggle('hidden',ap);if(!state.staff&&state.company)$('myTab').textContent=ap?'내 업무':'계약 전 서류';if(ap)markVMenu()}
 function markVMenu(){document.querySelectorAll('.vmb').forEach(b=>b.classList.toggle('active',b.id==='vm_'+vmenu));if(tab==='my'&&isVendorApproved())$('pageTitle').textContent=VMENU[vmenu]}
 /** 메뉴 이동 */
-function vgo(m,id){vmenu=m;if(id)vSel=id;toggleMenu(false);if(tab!=='my')switchTab('my');markVMenu();clearInterval(wkTimer);showQr=false;showAdd=false;window.scrollTo(0,0);
+function vgo(m,id){vmenu=m;if(id)vSel=id;toggleMenu(false);stopScan();MEET_TOKEN='';if(tab!=='my')switchTab('my');markVMenu();clearInterval(wkTimer);showQr=false;showAdd=false;window.scrollTo(0,0);
+ if(!$('execArea')){renderMy();return}  // 참석 체크 화면 뒤에는 업체 화면을 다시 그림
+ if(m==='meet'){renderVMeet();return}
  if(m==='dash'){vjob=null;loadMyJobs();return}if(m==='docs'){renderVDocs();return}if(m==='drill'){renderVDrill();return}vEnsureJob()}
 /** 승인 후 화면 시작 (renderMy에서 호출) */
-function vStart(){markVMenu();if(vmenu==='docs')return renderVDocs();if(vmenu==='drill')return renderVDrill();if(vmenu!=='dash'&&vjob)return renderVJob();loadMyJobs()}
+function vStart(){markVMenu();if(vmenu==='meet')return renderVMeet();if(vmenu==='docs')return renderVDocs();if(vmenu==='drill')return renderVDrill();if(vmenu!=='dash'&&vjob)return renderVJob();loadMyJobs()}
 async function vEnsureJob(){const el=$('execArea');if(!el)return;
  if(!vjobs){el.innerHTML='<div class="card"><p class="desc">공사를 불러오는 중입니다…</p></div>';try{vjobs=await callQuiet('myJobs')}catch(e){el.innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사를 불러오지 못했습니다.')+'</p></div>';return}}
  const jobs=vjobs.jobs;if(!jobs.length){el.innerHTML='<div class="card"><h2>'+escapeText(VMENU[vmenu])+'</h2><div class="note">아직 배정된 공사가 없습니다.<br>도급인 담당자가 공사에 업체를 배정하면 여기에서 진행할 수 있습니다.</div></div>';return}
