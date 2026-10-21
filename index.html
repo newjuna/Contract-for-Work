@@ -5,29 +5,46 @@ body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:ce
 .brand{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;margin-bottom:28px}
 .brand i{width:10px;height:10px;border-radius:50%;background:#d7262e}
 h1{font-size:22px;margin:0 0 6px;font-weight:700;color:#111827}
-.sub{margin:0 0 28px;font-size:14px;color:#6b7280}
+.sub{margin:0 0 22px;font-size:14px;color:#6b7280}
+.seg{display:flex;background:#f4f5f7;border-radius:12px;padding:4px;margin:0 0 20px;border:0}
+.seg label{flex:1;position:relative;cursor:pointer}
+.seg input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.seg span{display:block;text-align:center;padding:10px 6px;border-radius:9px;font-size:14px;font-weight:600;color:#6b7280}
+.seg input:checked+span{background:#fff;color:#111827;box-shadow:0 1px 3px #0000001f}
+.seg input:focus-visible+span{outline:2px solid #111827;outline-offset:1px}
 #googleBtn{display:flex;justify-content:center;min-height:44px}
 #status{margin:16px 0 0;font-size:13px;color:#6b7280;text-align:center;min-height:20px}
-.help{margin-top:24px;padding-top:18px;border-top:1px solid #e5e7eb;font-size:13px;color:#6b7280;line-height:1.7}
+.help{margin-top:20px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:13px;color:#6b7280;line-height:1.7}
 .ver{margin-top:18px;font-size:11px;color:#9ca3af;text-align:center;letter-spacing:.3px}
 </style></head><body>
 <main class="box">
   <div class="brand"><i aria-hidden="true"></i>도급 안전관리</div>
   <h1>로그인</h1>
-  <p class="sub">아성다이소 협력업체 · 직원 공용</p>
+  <p class="sub">접속 구분을 고른 뒤 Google 계정으로 로그인하세요.</p>
+  <fieldset class="seg" id="modeBox"><legend style="position:absolute;width:1px;height:1px;overflow:hidden">접속 구분</legend>
+    <label><input type="radio" name="mode" value="VENDOR" checked><span>협력업체</span></label>
+    <label><input type="radio" name="mode" value="STAFF"><span>다이소 담당자</span></label>
+  </fieldset>
   <div id="googleBtn"></div>
   <p id="status" role="status" aria-live="polite"></p>
-  <div class="help">처음 방문한 업체는 Google 로그인 후 사업자 등록을 신청합니다.<br>다이소 직원은 등록된 개인 Google 계정으로 로그인해 주세요.</div>
+  <div class="help" id="help"></div>
   <div class="ver" id="ver">&nbsp;</div>
 </main>
-<form id="entry" method="POST" style="display:none"><input name="credential" id="cred" type="hidden"><input name="review" id="review" type="hidden"></form>
+<form id="entry" method="POST" style="display:none"><input name="credential" id="cred" type="hidden"><input name="review" id="review" type="hidden"><input name="mode" id="modeVal" type="hidden"></form>
 <script>
 const CLIENT_ID='694588672504-0kogumff80pum5iu07eebrili8kmec1h.apps.googleusercontent.com';
 // Apps Script 신규 배포 후 이 한 줄에 /exec URL을 입력하세요.
-const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxeZTYFbhnnrOIXu_Bu2f9ab4HB-r6z1DWxiKmdGfPvvb3xuoNkZdp0TyqibQ9k0eHFdA/exec';
-const st=document.getElementById('status');
+const APPS_SCRIPT_URL='PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+const st=document.getElementById('status'),review=new URLSearchParams(location.search).get('review')||'';
 // 버전 표시: Apps Script(Code.gs의 APP_VERSION)에서 읽어 옴 → GitHub는 다시 고칠 필요 없음
 if(/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(APPS_SCRIPT_URL))fetch(APPS_SCRIPT_URL+'?ver=1').then(r=>r.json()).then(o=>{if(o&&typeof o.version==='string')document.getElementById('ver').textContent=o.version.slice(0,40)}).catch(()=>{});
-function loggedIn(r){if(!r.credential) return; if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(APPS_SCRIPT_URL)){st.textContent='Google 로그인은 완료되었습니다. Apps Script /exec 주소를 아직 등록하지 않았습니다.';return;} document.getElementById('entry').action=APPS_SCRIPT_URL;document.getElementById('cred').value=r.credential;document.getElementById('review').value=new URLSearchParams(location.search).get('review')||'';st.textContent='인증 정보를 확인하고 있습니다...';document.getElementById('entry').submit();}
+// 접속 구분: 마지막 선택 기억. 작업자 등록 QR(WRK-)로 들어온 경우는 구분 선택 숨김
+const HELP={VENDOR:'처음 방문한 업체는 로그인 후 사업자 등록을 신청합니다.',STAFF:'회사직원명단에 등록된 개인 Google 계정(Gmail)으로 로그인해 주세요.'};
+const radios=[...document.querySelectorAll('input[name=mode]')],mode=()=>radios.find(x=>x.checked).value;
+function showHelp(){document.getElementById('help').textContent=HELP[mode()]}
+try{const saved=localStorage.getItem('loginMode');const r=radios.find(x=>x.value===saved);if(r)r.checked=true}catch(e){}
+radios.forEach(x=>x.addEventListener('change',()=>{try{localStorage.setItem('loginMode',mode())}catch(e){}showHelp()}));
+if(/^WRK-/.test(review)){document.getElementById('modeBox').style.display='none';document.querySelector('.sub').textContent='작업자 등록 · 본인 Google 계정으로 로그인하세요.';document.getElementById('help').textContent='소장님이 보여 준 QR로 들어왔습니다. 이 공사에서 처음 한 번만 등록하면 됩니다.'}else showHelp();
+function loggedIn(r){if(!r.credential) return; if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(APPS_SCRIPT_URL)){st.textContent='Google 로그인은 완료되었습니다. Apps Script /exec 주소를 아직 등록하지 않았습니다.';return;} document.getElementById('entry').action=APPS_SCRIPT_URL;document.getElementById('cred').value=r.credential;document.getElementById('review').value=review;document.getElementById('modeVal').value=/^WRK-/.test(review)?'':mode();st.textContent='인증 정보를 확인하고 있습니다...';document.getElementById('entry').submit();}
 window.onload=()=>{if(!window.google?.accounts?.id){st.textContent='Google 로그인 라이브러리를 불러오지 못했습니다. 새로고침해 주세요.';return;} google.accounts.id.initialize({client_id:CLIENT_ID,callback:loggedIn,ux_mode:'popup'});google.accounts.id.renderButton(document.getElementById('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'});};
 </script></body></html>
