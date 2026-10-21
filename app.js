@@ -18,8 +18,9 @@ function input(id,label,value='',type='text',disabled=false,ph=''){return `<div 
 function text(id,label,value='',disabled=false){return `<div class="field"><label for="f_${id}">${escapeText(label)}</label><textarea id="f_${id}" ${disabled?'disabled':''}>${escapeText(value)}</textarea></div>`}
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();}
-/** 버전 표시 (서버 Code.gs의 APP_VERSION 값) */
-function showVer(s){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=s&&s.appVersion||'')}
+// ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
+const UI_VERSION='26.10.21 v4.8';
+function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;switchTab('staff')}
 function display(s){state=s;showVer(s);$('gearBtn').hidden=!s.isMaster;setTimeout(()=>{showBadges(s.badges);startBadges()},0);$('identity').textContent=(s.mode==='STAFF'?'[다이소 담당자로 접속] ':s.mode==='VENDOR'?'[협력업체로 접속] ':'')+'접속 계정: '+s.email+(s.staff?' · 아성다이소 '+s.staff.roleLabel+' '+s.staff.name:'');$('staffTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));$('jobsTab').classList.toggle('hidden',!s.staff);if(s.staff&&!s.company&&tab==='my'){$('myTab').textContent='내 업무';}$('adminTab').classList.toggle('hidden',!(['ADMIN','SAFETY'].includes(s.role)||s.isApprover));$('tplTab').classList.toggle('hidden',!['ADMIN','SAFETY'].includes(s.role));$('reviewTab').classList.toggle('hidden',!['ADMIN','SAFETY','CONTRACT'].includes(s.role));if($(tab+'Tab'))$('pageTitle').textContent=$(tab+'Tab').textContent;renderMy();}
@@ -376,8 +377,8 @@ function initLogin(){
  radios.forEach(x=>x.addEventListener('change',()=>{try{localStorage.setItem('loginMode',loginMode())}catch(e){}loginHelp()}));
  if(isWorkerLink()){$('modeBox').hidden=true;$('loginSub').textContent='작업자 등록 · 본인 Google 계정으로 로그인하세요.'}
  loginHelp();
- // 버전 표시: Code.gs의 APP_VERSION
- if(EXEC_OK)fetch(CONF.APPS_SCRIPT_URL+'?ver=1').then(r=>r.json()).then(o=>{if(o&&typeof o.version==='string')$('loginVer').textContent=o.version.slice(0,40)}).catch(()=>{});
+ // 버전 표시: 위쪽 UI_VERSION
+ $('loginVer').textContent=UI_VERSION;
  let note='';try{note=sessionStorage.getItem('loginNote')||'';sessionStorage.removeItem('loginNote')}catch(e){}
  if(!EXEC_OK)note='config.js에 Apps Script 주소(/exec)를 먼저 등록해 주세요.';
  if(SESSION){showApp();bootApp()}else showLogin(note);
