@@ -127,3 +127,11 @@ body{background:var(--bg);color:var(--text);font:15px/1.6 "Pretendard","Malgun G
 .toast{z-index:60}
 .pt td.dc{width:17%}.pt td.dc .ml{display:block}.pt td.dc .si{width:100%;min-width:0}
 .pt.sign{table-layout:fixed}.pt.sign td.yl{width:50%}.pt.sign th.w1{width:110px}
+/* ===== v5.0 순회점검일지 ===== */
+.pill.bad{background:#fdecec;color:var(--accent)}
+.thumb{position:relative;display:inline-block}.thumb img{width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--bg);cursor:pointer;display:block}
+.thumb .tx{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;border:0;background:#111;color:#fff;font-size:11px;cursor:pointer}
+.ilog .rtable td,.ilog .rtable th{vertical-align:middle}
+/* 카드형 양식(작업 안전 수칙·순회점검일지)은 화면 폭에 맞춤 — 허가서 시트(820px) 규칙과 분리 */
+.card.sheet{width:auto;margin:0 0 14px;padding:22px;box-shadow:none;font-size:inherit;line-height:inherit;color:inherit}
+@media(max-width:650px){.card.sheet{padding:16px}}
