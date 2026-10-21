@@ -34,7 +34,7 @@ h1{font-size:22px;margin:0 0 6px;font-weight:700;color:#111827}
 <script>
 const CLIENT_ID='694588672504-0kogumff80pum5iu07eebrili8kmec1h.apps.googleusercontent.com';
 // Apps Script 신규 배포 후 이 한 줄에 /exec URL을 입력하세요.
-const APPS_SCRIPT_URL='PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbxCB5skhLHKfv3lC8u_DdnQEwwB_xB7d9Wq515wZuIRb4TFX9cfeUmD2i5ZXwNFRyxCcA/exec';
 const st=document.getElementById('status'),review=new URLSearchParams(location.search).get('review')||'';
 // 버전 표시: Apps Script(Code.gs의 APP_VERSION)에서 읽어 옴 → GitHub는 다시 고칠 필요 없음
 if(/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(APPS_SCRIPT_URL))fetch(APPS_SCRIPT_URL+'?ver=1').then(r=>r.json()).then(o=>{if(o&&typeof o.version==='string')document.getElementById('ver').textContent=o.version.slice(0,40)}).catch(()=>{});
