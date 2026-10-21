@@ -1,7 +1,31 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>도급계약 및 실행관리 | 로그인</title><script src="https://accounts.google.com/gsi/client" async defer></script><style>*{box-sizing:border-box}body{margin:0;background:#f6f7f9;font-family:"Malgun Gothic","맑은 고딕",Arial,sans-serif;color:#1e283b}header{background:#ef3155;color:white;padding:26px 20px;text-align:center}main{max-width:520px;margin:42px auto;padding:32px;background:white;border:1px solid #e7eaf0;border-radius:18px}h1{font-size:25px;margin:0 0 10px}h2{font-size:20px}p{font-size:14px;line-height:1.8;color:#596579}#googleBtn{display:flex;justify-content:center;padding:18px}.notice{background:#fff4f5;padding:14px;border-radius:9px;font-size:13px}a{color:#224f99}@media(max-width:600px){main{margin:18px 12px;padding:25px}}</style></head><body><header><h1>도급계약 및 실행관리</h1><div>아성다이소 · 안전보건 협력업체 포털</div></header><main><h2>Google 계정으로 로그인</h2><p>사업자 등록 신청과 안전보건정보 작성을 위해 등록할 Google 계정으로 로그인해 주세요.</p><div id="googleBtn"></div><div id="status" class="notice">관리자가 승인한 계정만 협력업체 업무를 사용할 수 있습니다.</div><p>처음 방문한 업체는 로그인 후 사업자 등록을 신청합니다.</p></main><form id="entry" method="POST" style="display:none"><input name="credential" id="cred" type="hidden"><input name="review" id="review" type="hidden"></form><script>
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>도급 안전관리 | 로그인</title><script src="https://accounts.google.com/gsi/client" async defer></script><style>
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f4f5f7;color:#1f2937;font:15px/1.6 "Pretendard","Malgun Gothic","맑은 고딕",Arial,sans-serif;padding:24px 16px}
+.box{width:100%;max-width:380px;background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:36px 28px 28px}
+.brand{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;margin-bottom:28px}
+.brand i{width:10px;height:10px;border-radius:50%;background:#d7262e}
+h1{font-size:22px;margin:0 0 6px;font-weight:700;color:#111827}
+.sub{margin:0 0 28px;font-size:14px;color:#6b7280}
+#googleBtn{display:flex;justify-content:center;min-height:44px}
+#status{margin:16px 0 0;font-size:13px;color:#6b7280;text-align:center;min-height:20px}
+.help{margin-top:24px;padding-top:18px;border-top:1px solid #e5e7eb;font-size:13px;color:#6b7280;line-height:1.7}
+.ver{margin-top:18px;font-size:11px;color:#9ca3af;text-align:center;letter-spacing:.3px}
+</style></head><body>
+<main class="box">
+  <div class="brand"><i aria-hidden="true"></i>도급 안전관리</div>
+  <h1>로그인</h1>
+  <p class="sub">아성다이소 협력업체 · 직원 공용</p>
+  <div id="googleBtn"></div>
+  <p id="status" role="status" aria-live="polite"></p>
+  <div class="help">처음 방문한 업체는 Google 로그인 후 사업자 등록을 신청합니다.<br>다이소 직원은 등록된 개인 Google 계정으로 로그인해 주세요.</div>
+  <div class="ver">26.10.21 v3.0</div>
+</main>
+<form id="entry" method="POST" style="display:none"><input name="credential" id="cred" type="hidden"><input name="review" id="review" type="hidden"></form>
+<script>
 const CLIENT_ID='694588672504-0kogumff80pum5iu07eebrili8kmec1h.apps.googleusercontent.com';
 // Apps Script 신규 배포 후 이 한 줄에 /exec URL을 입력하세요.
-const APPS_SCRIPT_URL='https://script.google.com/macros/s/AKfycbzlk7IF6dxSPZFVAcCrWPVUKJbtCUJzdzh_1JDIkblk3R5sNn3t9NVMcjKtgP3PuSqgSw/exec';
-function loggedIn(r){if(!r.credential) return; if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(APPS_SCRIPT_URL)){document.getElementById('status').textContent='Google 로그인은 완료되었습니다. Apps Script /exec 주소를 아직 등록하지 않았습니다.';return;} document.getElementById('entry').action=APPS_SCRIPT_URL;document.getElementById('cred').value=r.credential;document.getElementById('review').value=new URLSearchParams(location.search).get('review')||'';document.getElementById('status').textContent='인증 정보를 확인하고 있습니다...';document.getElementById('entry').submit();}
-window.onload=()=>{if(!window.google?.accounts?.id){document.getElementById('status').textContent='Google 로그인 라이브러리를 불러오지 못했습니다. 새로고침해 주세요.';return;} google.accounts.id.initialize({client_id:CLIENT_ID,callback:loggedIn,ux_mode:'popup'});google.accounts.id.renderButton(document.getElementById('googleBtn'),{theme:'outline',size:'large',width:280,text:'signin_with'});};
+const APPS_SCRIPT_URL='PASTE_APPS_SCRIPT_EXEC_URL_HERE';
+const st=document.getElementById('status');
+function loggedIn(r){if(!r.credential) return; if(!/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(APPS_SCRIPT_URL)){st.textContent='Google 로그인은 완료되었습니다. Apps Script /exec 주소를 아직 등록하지 않았습니다.';return;} document.getElementById('entry').action=APPS_SCRIPT_URL;document.getElementById('cred').value=r.credential;document.getElementById('review').value=new URLSearchParams(location.search).get('review')||'';st.textContent='인증 정보를 확인하고 있습니다...';document.getElementById('entry').submit();}
+window.onload=()=>{if(!window.google?.accounts?.id){st.textContent='Google 로그인 라이브러리를 불러오지 못했습니다. 새로고침해 주세요.';return;} google.accounts.id.initialize({client_id:CLIENT_ID,callback:loggedIn,ux_mode:'popup'});google.accounts.id.renderButton(document.getElementById('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'});};
 </script></body></html>
