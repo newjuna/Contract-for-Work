@@ -6,7 +6,7 @@ let state=null,activeStep=1,saveTimer=null,dirty=false,tab='my',reviewing=null;
 const $=id=>document.getElementById(id),escapeText=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function msg(t){$('toast').textContent=t;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',4500)}
 /* 로딩 진행률: 서버는 실제 진행률을 알려주지 않으므로 예상치로 92%까지 천천히 오르고, 완료되면 100% */
-const LOAD_MSG={portalData:'화면을 불러오는 중',registerBusiness:'신청서를 접수하는 중',uploadContractDoc:'파일을 올리는 중',uploadEvidence:'파일을 올리는 중',getTemplate:'샘플 양식을 내려받는 중',getMyFile:'파일을 내려받는 중',saveStep:'저장하는 중',submitProfile:'최종 제출하는 중',checkSubmission:'누락 항목을 확인하는 중',uploadTemplate:'양식을 등록하는 중',refreshTemplateFolders:'Drive 폴더를 확인하는 중',saveJob:'공사를 저장하는 중',jobBoard:'공사 목록을 불러오는 중',createMeeting:'미팅 방을 만드는 중',deleteJob:'공사를 삭제하는 중',deleteMeeting:'미팅 방을 삭제하는 중',meetingDetail:'미팅 방을 여는 중',vendorJob:'공사 화면을 여는 중',saveCrew:'오늘 인원을 저장하는 중',addWorker:'작업자를 등록하는 중',workerCheckIn:'등록하는 중',meetCheckIn:'참석을 확인하는 중',saveMeetingDocs:'점검표·회의록을 저장하는 중',completeMeeting:'미팅 실시 완료를 확정하는 중',reopenMeetingDocs:'완료를 취소하는 중'};
+const LOAD_MSG={portalData:'화면을 불러오는 중',registerBusiness:'신청서를 접수하는 중',uploadContractDoc:'파일을 올리는 중',uploadEvidence:'파일을 올리는 중',getTemplate:'샘플 양식을 내려받는 중',getMyFile:'파일을 내려받는 중',saveStep:'저장하는 중',submitProfile:'최종 제출하는 중',checkSubmission:'누락 항목을 확인하는 중',uploadTemplate:'양식을 등록하는 중',refreshTemplateFolders:'Drive 폴더를 확인하는 중',saveJob:'공사를 저장하는 중',jobBoard:'공사 목록을 불러오는 중',createMeeting:'미팅 방을 만드는 중',deleteJob:'공사를 삭제하는 중',deleteMeeting:'미팅 방을 삭제하는 중',meetingDetail:'미팅 방을 여는 중',vendorJob:'공사 화면을 여는 중',saveCrew:'오늘 인원을 저장하는 중',addWorker:'작업자를 등록하는 중',workerCheckIn:'등록하는 중',meetCheckIn:'참석을 확인하는 중',saveMeetingDocs:'점검표·회의록을 저장하는 중',completeMeeting:'미팅 실시 완료를 확정하는 중',reopenMeetingDocs:'완료를 취소하는 중',uploadMeetingPhoto:'사진을 올리는 중',getMeetingPhoto:'사진을 불러오는 중'};
 let loadTimer=null,loadPct=0,loadCount=0,coverTimer=null;
 function loadStart(name){loadCount++;if(loadCount>1)return;loadPct=0;$('loadMsg').textContent=(LOAD_MSG[name]||'처리하는 중')+'입니다';$('loadHint').textContent='잠시만 기다려 주세요';loadShow();/* v4.2 0.4초 안에 끝나면 로딩 화면 안 띄움 */clearTimeout(coverTimer);coverTimer=setTimeout(()=>{if(loadCount)$('cover').style.display='flex'},400);const t0=Date.now();clearInterval(loadTimer);loadTimer=setInterval(()=>{loadPct+=(92-loadPct)*0.05;const s=(Date.now()-t0)/1000;$('loadHint').textContent=s<3?'잠시만 기다려 주세요':s<7?'입력한 내용을 확인하고 저장하는 중입니다 · 정상 진행 중':s<15?'구글 시트에 기록하고 있습니다 · 보통 5~15초 걸립니다':'서버 응답을 기다리고 있습니다 ('+Math.round(s)+'초) · 오류가 아니니 창을 닫지 마세요';loadShow()},150)}
 function loadShow(){const p=Math.min(100,Math.round(loadPct));$('loadBar').style.width=p+'%';$('loadPct').textContent=p}
@@ -174,73 +174,82 @@ async function saveJobForm(e,id){e.preventDefault();
 function meetForm(jobId){jobsMode='form';const j=jobData.jobs.find(x=>x.id===jobId),today=new Date().toISOString().slice(0,10);$('jobs').innerHTML='<div class="card"><h2>미팅 방 만들기 · '+escapeText(j.title)+'</h2><form onsubmit="saveMeetForm(event,\''+escapeText(jobId)+'\')"><div class="split">'+input('mTitle','미팅명','착수 전 현장 미팅')+input('mPlace','장소',j.storeName)+input('mDate','일자',today,'date')+input('mTime','시간 (선택)','','time')+'</div><div class="field"><label>포함할 행사</label>'+Object.entries(jobData.meetKinds).map(([k,v])=>'<label class="desc" style="display:block;margin:6px 0"><input type="checkbox" class="mk" value="'+k+'" checked> '+escapeText(v)+'</label>').join('')+'</div><p class="desc">만들면 참여 업체 대표 계정에 안내 메일이 갑니다. 참석 체크는 현장에서 [방 열기]를 눌러야 시작됩니다.</p><div class="row"><button class="button" type="submit">방 만들기</button><button class="button ghost" type="button" onclick="renderJobs()">취소</button></div></form></div>'}
 async function saveMeetForm(e,jobId){e.preventDefault();const d={title:value('mTitle'),place:value('mPlace'),date:value('mDate'),time:value('mTime'),kinds:[...document.querySelectorAll('.mk:checked')].map(x=>x.value)};try{const r=await call('createMeeting',jobId,d);showRoom(r);msg('미팅 방을 만들었습니다.')}catch(err){alert(err.message)}}
 async function openRoom(id){try{showRoom(await call('meetingDetail',id))}catch(e){}}
-function showRoom(r){
- // 같은 방을 다시 그릴 때(방 열기·참석 확인 등) 작성 중인 점검표·회의록 입력값 유지
- if(room&&room.id===r.id&&!r.done&&($('jointCard')||$('minCard'))){collectDocs();if($('jointCard'))r.joint=room.joint;if($('minCard'))r.minutes=room.minutes}
- const jm=jobData&&jobData.jobs.flatMap(j=>j.meetings).find(m=>m.id===r.id);if(jm){jm.done=!!r.done;jm.open=!!r.open}
- jobsMode='room';roomId=r.id;clearInterval(roomTimer);const qr='https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data='+encodeURIComponent(r.link);
- const groups=[['아성다이소 (도급인)',r.attendees.filter(x=>x.side==='STAFF')]].concat(r.vendors.map(v=>[v.company+' · '+v.trade,r.attendees.filter(x=>x.side==='VENDOR'&&x.companyId===v.companyId)]));
- const row=x=>'<div class="item"><div class="row" style="justify-content:space-between"><div><b>'+escapeText(x.name)+'</b> <span class="muted">'+escapeText(x.role)+' · '+escapeText(fmtTime(x.checkedAt))+' · '+escapeText(x.email)+'</span>'+(x.status==='PENDING'?' <span class="pill todo">확인 대기</span>':' <span class="pill ok">✔ 참석</span>')+'</div>'+(x.status==='PENDING'?'<div class="row"><button class="button" type="button" onclick="confirmAt(\''+escapeText(x.id)+'\',true)">확인</button><button class="button ghost" type="button" onclick="confirmAt(\''+escapeText(x.id)+'\',false)">제외</button></div>':'')+'</div></div>';
- $('jobs').innerHTML='<div class="card"><button class="button ghost" type="button" onclick="loadJobs()">← 공사 목록</button><h2 style="margin-top:12px">'+escapeText(r.title)+' · '+escapeText(r.job.storeName)+'</h2><div class="muted">'+escapeText(r.date)+' '+escapeText(r.time||'')+' · '+escapeText(r.place)+' · '+escapeText(r.kinds.join(', '))+'</div>'
- +(r.done?'<div class="note" style="margin-top:12px"><b style="color:var(--ok)">✔ 미팅 실시 완료</b> · '+escapeText(fmtTime(r.doneAt))+' · '+escapeText(r.doneBy||'')+'</div>':'<div class="row" style="margin-top:12px"><button class="button '+(r.open?'dark':'')+'" style="flex:1" type="button" onclick="toggleRoom('+(!r.open)+')">'+(r.open?'방 닫기 (참석 체크 종료)':'방 열기 (참석 체크 시작)')+'</button></div>')
- +(r.open?'<div style="text-align:center;margin:16px 0"><img src="'+escapeText(qr)+'" alt="참석 체크 QR 코드" width="260" height="260" style="border:1px solid #e3e6ec;border-radius:12px"><div class="desc">참석자가 휴대폰 카메라로 찍고 <b>본인 Google 계정</b>으로 로그인하면 체크됩니다.</div><div class="row" style="justify-content:center"><button class="button ghost" type="button" onclick="copyLink(\''+escapeText(r.link)+'\')">참여 링크 복사</button></div></div>':(r.done?'':'<div class="note" style="margin-top:12px">방이 닫혀 있어 지금은 참석 체크가 되지 않습니다.</div>'))+'</div>'
- +'<div id="roomAtt">'+attCard(r,groups,row)+'</div>'+meetDocsHtml(r);room=r;
- // 참석자 목록만 8초마다 새로 고침 (작성 중인 점검표·회의록은 그대로 둠)
- if(r.open)roomTimer=setInterval(async()=>{if(tab!=='jobs'||roomId!==r.id){clearInterval(roomTimer);return}try{const x=await callQuiet('meetingDetail',r.id);if(x.open!==room.open||x.done!==room.done){collectDocs();x.joint=room.joint;x.minutes=room.minutes;showRoom(x);return}if(JSON.stringify(x.attendees)!==JSON.stringify(room.attendees)){room.attendees=x.attendees;showRoomAtt()}}catch(e){}},8000)}
-let room=null;
-function attCard(r,groups,row){return '<div class="card"><h2>참석자 '+r.attendees.filter(x=>x.status==='OK').length+'명'+(r.attendees.some(x=>x.status==='PENDING')?' · <span class="req">확인 대기 '+r.attendees.filter(x=>x.status==='PENDING').length+'</span>':'')+'</h2>'+groups.map(([g,list])=>'<div class="stage">'+escapeText(g)+' ('+list.length+')</div>'+(list.map(row).join('')||'<p class="muted">아직 없음</p>')).join('')+'</div>'}
-/** 참석자 카드만 다시 그리기 */
-function showRoomAtt(){const r=room;const row=x=>'<div class="item"><div class="row" style="justify-content:space-between"><div><b>'+escapeText(x.name)+'</b> <span class="muted">'+escapeText(x.role)+' · '+escapeText(fmtTime(x.checkedAt))+' · '+escapeText(x.email)+'</span>'+(x.status==='PENDING'?' <span class="pill todo">확인 대기</span>':' <span class="pill ok">✔ 참석</span>')+'</div>'+(x.status==='PENDING'?'<div class="row"><button class="button" type="button" onclick="confirmAt(\''+escapeText(x.id)+'\',true)">확인</button><button class="button ghost" type="button" onclick="confirmAt(\''+escapeText(x.id)+'\',false)">제외</button></div>':'')+'</div></div>';
- const groups=[['아성다이소 (도급인)',r.attendees.filter(x=>x.side==='STAFF')]].concat(r.vendors.map(v=>[v.company+' · '+v.trade,r.attendees.filter(x=>x.side==='VENDOR'&&x.companyId===v.companyId)]));
- if($('roomAtt'))$('roomAtt').innerHTML=attCard(r,groups,row);if($('jStaffNames'))$('jStaffNames').textContent=staffNames(r);if($('jVendorNames'))$('jVendorNames').innerHTML=vendorNamesHtml(r)}
-/* ---------- v4.5 합동안전보건 점검표 · 협력사 협의체 회의록 · 미팅 실시 완료 ---------- */
+/* ---------- v4.6 미팅 방: 탭으로 나눔 [QR 참석] [합동점검] [협의체 회의록] + 아래 실시 완료 ---------- */
+let room=null,roomTab='att';const photoPrev={};
 const MARK={OK:'양호',BAD:'불량',NA:'해당없음'};
-const staffNames=r=>r.attendees.filter(x=>x.side==='STAFF'&&x.status==='OK').map(x=>x.name).join(', ')||'(참석 체크한 도급인 없음)';
-const vendorNamesHtml=r=>r.vendors.map(v=>{const n=r.attendees.filter(x=>x.side==='VENDOR'&&x.companyId===v.companyId&&x.status==='OK').map(x=>x.name);return '<div><b>'+escapeText(v.company)+'</b> <span class="muted">'+escapeText(v.trade)+'</span> · '+(n.length?escapeText(n.join(', ')):'<span class="req">미참석</span>')+'</div>'}).join('');
-function meetDocsHtml(r){const K=r.kindCodes||[],J=r.joint||{items:{},actions:'',opinions:{}},M=r.minutes||{type:'임시',start:r.time||'',end:'',proposals:'',results:'',etc:''},dis=r.done?'disabled':'';
- let h='';
- if(K.includes('JOINT')){let grp='';
-  h+='<div class="card" id="jointCard"><div class="vh-top"><h2 style="margin:0">도급 사업 협력사 합동안전보건 점검표</h2><span class="pill lock">최초1회</span></div>'
-   +'<table class="rtable" style="margin-top:12px"><tr><th>현장명</th><td>다이소 '+escapeText(r.job.storeName)+'</td><th>점검일</th><td>'+escapeText(r.date)+'</td></tr><tr><th>점검자<br>도급인</th><td colspan="3" id="jStaffNames">'+escapeText(staffNames(r))+'</td></tr><tr><th>점검자<br>수급인</th><td colspan="3" id="jVendorNames">'+vendorNamesHtml(r)+'</td></tr></table>'
-   +'<p class="muted" style="margin:8px 0 0">점검자는 미팅 참석 체크(본인 Google 계정)로 자동 기록됩니다.</p>'
-   +r.jointItems.map(([g,t],i)=>{const n=i+1,v=J.items[n]||'';const head=g!==grp?(grp=g,'<div class="stage">'+escapeText(g)+'</div>'):'';
-     return head+'<div class="jitem'+(v==='BAD'?' bad':'')+'" id="ji_'+n+'"><div class="jq"><b>'+n+'.</b> '+escapeText(t)+'</div><div class="jm" role="radiogroup" aria-label="'+n+'번 점검 결과">'+Object.entries(MARK).map(([k,l])=>'<label class="jb '+k.toLowerCase()+'"><input type="radio" name="ji'+n+'" value="'+k+'" '+(v===k?'checked':'')+' '+dis+' onchange="jointMark('+n+')"><span>'+l+'</span></label>').join('')+'</div></div>'}).join('')
-   +'<div class="field"><label for="f_jActions">※ 불량판정에 대한 조치 사항, 개선사항</label><textarea id="f_jActions" '+dis+' placeholder="불량 항목이 있으면 반드시 적어 주세요. 예) 3번 개구부 덮개 설치 — ○○인테리어, 10/21까지">'+escapeText(J.actions)+'</textarea></div>'
-   +'<div class="stage">업체별 의견 청취 메모</div>'+r.vendors.map(v=>'<div class="field"><label for="op_'+escapeText(v.companyId)+'">'+escapeText(v.company)+' <span class="muted">('+escapeText(v.trade)+')</span></label><input id="op_'+escapeText(v.companyId)+'" class="opin" data-id="'+escapeText(v.companyId)+'" value="'+escapeText(J.opinions[v.companyId]||'')+'" '+dis+' placeholder="업체가 낸 의견·요청 (없으면 비워 둠)"></div>').join('')
-   +'</div>'}
- if(K.includes('COUNCIL')){
-  h+='<div class="card" id="minCard"><div class="vh-top"><h2 style="margin:0">협력사 협의체 회의록</h2>'+(r.done?'':'<button class="button ghost" type="button" onclick="autoMinutes()">점검 결과로 자동 작성</button>')+'</div>'
-   +'<table class="rtable" style="margin-top:12px"><tr><th>현장명</th><td>'+escapeText(r.job.storeName)+'</td><th>회의구분</th><td><label><input type="radio" name="mType" value="정기" '+(M.type==='정기'?'checked':'')+' '+dis+'> 정기</label> <label><input type="radio" name="mType" value="임시" '+(M.type!=='정기'?'checked':'')+' '+dis+'> 임시</label></td></tr>'
-   +'<tr><th>일 시</th><td colspan="3">'+escapeText(r.date)+' <input type="time" id="f_mStart" value="'+escapeText(M.start)+'" '+dis+' aria-label="시작 시각"> ~ <input type="time" id="f_mEnd" value="'+escapeText(M.end)+'" '+dis+' aria-label="종료 시각"></td></tr>'
-   +'<tr><th>참석 인원<br>도급인</th><td colspan="3">'+escapeText(staffNames(r))+'</td></tr><tr><th>수급인</th><td colspan="3" class="req">협력사 협의체 명부로 대체</td></tr></table>'
-   +'<div class="field"><label for="f_mProp">발 의 내 용 <span class="muted">(한 줄에 1개)</span></label><textarea id="f_mProp" '+dis+'>'+escapeText(M.proposals)+'</textarea></div>'
-   +'<div class="field"><label for="f_mRes">심 의 결 과 <span class="muted">(한 줄에 1개)</span></label><textarea id="f_mRes" '+dis+'>'+escapeText(M.results)+'</textarea></div>'
-   +'<div class="field"><label for="f_mEtc">기타사항</label><textarea id="f_mEtc" '+dis+' style="min-height:70px">'+escapeText(M.etc)+'</textarea></div></div>'}
- if(!K.length)return '';
- return h+'<div class="card">'+(r.done?'<div class="row"><button class="button ghost" type="button" onclick="reopenDocs()">완료 취소 (내용 고치기)</button></div>'
-  :'<p class="desc">작성 중인 내용은 [임시 저장]으로 보관됩니다. 모두 마치면 <b>[미팅 실시 완료]</b>를 눌러 확정해 주세요. 확정하면 방이 닫힙니다.</p><div class="row"><button class="button ghost" type="button" style="flex:1" onclick="saveDocs()">임시 저장</button><button class="button" type="button" style="flex:2" onclick="doneMeeting()">미팅 실시 완료</button></div>')+'</div>'}
-function jointMark(n){const el=$('ji_'+n),v=document.querySelector('input[name=ji'+n+']:checked')?.value;if(el){el.classList.toggle('bad',v==='BAD');el.classList.remove('miss','shake')}}
+const okAtt=r=>r.attendees.filter(x=>x.status==='OK');
+const staffNames=r=>okAtt(r).filter(x=>x.side==='STAFF').map(x=>x.name).join(', ')||'(참석 체크한 도급인 없음)';
+const vendorNamesHtml=r=>r.vendors.map(v=>{const n=okAtt(r).filter(x=>x.side==='VENDOR'&&x.companyId===v.companyId).map(x=>x.name);return '<div><b>'+escapeText(v.company)+'</b> <span class="muted">'+escapeText(v.trade)+'</span> · '+(n.length?escapeText(n.join(', ')):'<span class="req">미참석</span>')+'</div>'}).join('')||'<span class="muted">배정된 업체 없음</span>';
+function showRoom(r){
+ // 같은 방을 다시 그릴 때(방 열기·참석 확인 등) 작성 중인 내용 유지
+ if(room&&room.id===r.id&&!r.done&&$('roomDocs')){collectDocs();r.joint=room.joint;r.minutes=room.minutes}
+ if(!r.joint){const items={};(r.jointItems||[]).forEach((_,i)=>items[i+1]='OK');r.joint={items,notes:{}}}  // 처음엔 전 항목 '양호'로 미리 체크
+ r.joint.notes=r.joint.notes||{};r.minutes=r.minutes||{type:'임시',start:r.time||'',end:'',etc:''};
+ const jm=jobData&&jobData.jobs.flatMap(j=>j.meetings).find(m=>m.id===r.id);if(jm){jm.done=!!r.done;jm.open=!!r.open}
+ if(!room||room.id!==r.id)roomTab='att';
+ jobsMode='room';roomId=r.id;room=r;clearInterval(roomTimer);
+ const K=r.kindCodes||[],tabs=[['att','QR 참석 '+okAtt(r).length+'명']].concat(K.includes('JOINT')?[['joint','합동점검']]:[]).concat(K.includes('COUNCIL')?[['council','협의체 회의록']]:[]);
+ if(!tabs.some(t=>t[0]===roomTab))roomTab='att';
+ $('jobs').innerHTML='<div class="card"><button class="button ghost" type="button" onclick="loadJobs()">← 공사 목록</button><h2 style="margin-top:12px">'+escapeText(r.title)+' · '+escapeText(r.job.storeName)+'</h2><div class="muted">'+escapeText(r.date)+' '+escapeText(r.time||'')+' · '+escapeText(r.place)+' · '+escapeText(r.kinds.join(', '))+'</div>'
+  +(r.done?'<div class="note" style="margin-top:12px"><b style="color:var(--ok)">✔ 미팅 실시 완료</b> · '+escapeText(fmtTime(r.doneAt))+' · '+escapeText(r.doneBy||'')+'</div>':'')
+  +'<div class="seg" role="tablist">'+tabs.map(([k,l])=>'<button type="button" role="tab" id="rt_'+k+'" aria-selected="'+(roomTab===k)+'" class="'+(roomTab===k?'on':'')+'" onclick="setRoomTab(\''+k+'\')">'+escapeText(l)+'</button>').join('')+'</div></div>'
+  +'<div id="roomDocs"><div id="rp_att" '+(roomTab==='att'?'':'hidden')+'>'+attPanel(r)+'</div>'
+  +(K.includes('JOINT')?'<div id="rp_joint" '+(roomTab==='joint'?'':'hidden')+'>'+jointPanel(r)+'</div>':'')
+  +(K.includes('COUNCIL')?'<div id="rp_council" '+(roomTab==='council'?'':'hidden')+'>'+councilPanel(r)+'</div>':'')+'</div>'
+  +footPanel(r);
+ // 참석자만 8초마다 새로 고침 (작성 중인 내용은 그대로)
+ if(r.open)roomTimer=setInterval(async()=>{if(tab!=='jobs'||roomId!==r.id){clearInterval(roomTimer);return}try{const x=await callQuiet('meetingDetail',r.id);if(x.open!==room.open||x.done!==room.done){showRoom(x);return}if(JSON.stringify(x.attendees)!==JSON.stringify(room.attendees)){room.attendees=x.attendees;refreshAtt()}}catch(e){}},8000)}
+function setRoomTab(k){collectDocs();roomTab=k;['att','joint','council'].forEach(t=>{const p=$('rp_'+t),b=$('rt_'+t);if(p)p.hidden=t!==k;if(b){b.classList.toggle('on',t===k);b.setAttribute('aria-selected',String(t===k))}});if(k==='council')refreshResults();window.scrollTo(0,0)}
+/* ① QR 참석 */
+function attRow(x){return '<div class="item"><div class="row" style="justify-content:space-between"><div><b>'+escapeText(x.name)+'</b> <span class="muted">'+escapeText(x.role)+' · '+escapeText(fmtTime(x.checkedAt))+' · '+escapeText(x.email)+'</span>'+(x.status==='PENDING'?' <span class="pill todo">확인 대기</span>':' <span class="pill ok">✔ 참석</span>')+'</div>'+(x.status==='PENDING'?'<div class="row"><button class="button" type="button" onclick="confirmAt(\''+escapeText(x.id)+'\',true)">확인</button><button class="button ghost" type="button" onclick="confirmAt(\''+escapeText(x.id)+'\',false)">제외</button></div>':'')+'</div></div>'}
+function attList(r){const groups=[['아성다이소 (도급인)',r.attendees.filter(x=>x.side==='STAFF')]].concat(r.vendors.map(v=>[v.company+' · '+v.trade,r.attendees.filter(x=>x.side==='VENDOR'&&x.companyId===v.companyId)]));
+ return '<div class="card"><h2>참석자 '+okAtt(r).length+'명'+(r.attendees.some(x=>x.status==='PENDING')?' · <span class="req">확인 대기 '+r.attendees.filter(x=>x.status==='PENDING').length+'</span>':'')+'</h2>'+groups.map(([g,list])=>'<div class="stage">'+escapeText(g)+' ('+list.length+')</div>'+(list.map(attRow).join('')||'<p class="muted">아직 없음</p>')).join('')+'</div>'}
+function attPanel(r){const qr='https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=8&data='+encodeURIComponent(r.link);
+ return (r.done?'':'<div class="card"><button class="button '+(r.open?'dark':'')+'" style="width:100%" type="button" onclick="toggleRoom('+(!r.open)+')">'+(r.open?'방 닫기 (참석 체크 종료)':'방 열기 (참석 체크 시작)')+'</button>'
+  +(r.open?'<div style="text-align:center;margin:16px 0 0"><img src="'+escapeText(qr)+'" alt="참석 체크 QR 코드" width="260" height="260" style="border:1px solid var(--line);border-radius:12px"><div class="desc">참석자가 휴대폰 카메라로 찍고 <b>본인 Google 계정</b>으로 로그인하면 체크됩니다.</div><button class="button ghost" type="button" onclick="copyLink(\''+escapeText(r.link)+'\')">참여 링크 복사</button></div>':'<div class="note" style="margin-top:12px">방이 닫혀 있어 지금은 참석 체크가 되지 않습니다.</div>')+'</div>')
+  +'<div id="roomAtt">'+attList(r)+'</div>'}
+function refreshAtt(){const r=room;if($('roomAtt'))$('roomAtt').innerHTML=attList(r);if($('rt_att'))$('rt_att').textContent='QR 참석 '+okAtt(r).length+'명';document.querySelectorAll('.jStaff').forEach(x=>x.textContent=staffNames(r));document.querySelectorAll('.jVendor').forEach(x=>x.innerHTML=vendorNamesHtml(r))}
+/* ② 합동점검: 전 항목 양호로 시작 → 불량 누르면 메모·사진 칸이 열림 */
+function photoList(n){const ids=(room.joint.notes[n]||{}).photos||[];return ids.map((id,i)=>photoPrev[id]?'<img class="jph" src="'+photoPrev[id]+'" alt="'+n+'번 불량 사진 '+(i+1)+'" onclick="viewPhoto(\''+escapeText(id)+'\')">':'<button class="button ghost" type="button" onclick="viewPhoto(\''+escapeText(id)+'\')">📷 사진 '+(i+1)+'</button>').join('')}
+function badBox(n,dis){const nt=room.joint.notes[n]||{};return '<div class="jbad"><label for="f_jm'+n+'">지적 내용 · 조치 <span class="req">*</span></label><input id="f_jm'+n+'" class="jmemo" data-n="'+n+'" value="'+escapeText(nt.memo||'')+'" '+dis+' placeholder="예) 개구부 덮개 미설치 → 덮개 설치 (○○인테리어, 10/21)"><div class="row" style="margin-top:8px" id="jp_'+n+'">'+photoList(n)
+ +(dis?'':'<label class="button ghost" for="jf_'+n+'">📷 사진 넣기</label><input class="hidefile" type="file" id="jf_'+n+'" accept="image/*" capture="environment" onchange="addPhoto('+n+')" aria-label="'+n+'번 불량 사진 선택">')+'</div></div>'}
+function jointPanel(r){const J=r.joint,dis=r.done?'disabled':'';let grp='';const bad=Object.values(J.items).filter(v=>v==='BAD').length;
+ return '<div class="card"><div class="vh-top"><h2 style="margin:0">도급 사업 협력사 합동안전보건 점검표</h2><span class="pill lock">최초1회</span></div>'
+  +'<table class="rtable" style="margin-top:12px"><tr><th>현장명</th><td>다이소 '+escapeText(r.job.storeName)+'</td><th>점검일</th><td>'+escapeText(r.date)+'</td></tr><tr><th>점검자<br>도급인</th><td colspan="3" class="jStaff">'+escapeText(staffNames(r))+'</td></tr><tr><th>점검자<br>수급인</th><td colspan="3" class="jVendor">'+vendorNamesHtml(r)+'</td></tr></table>'
+  +'<p class="desc" style="margin:10px 0 0">전 항목이 <b>양호</b>로 미리 체크되어 있습니다. 지적사항만 <b>불량</b>(또는 해당없음)으로 바꾸고, 불량은 메모와 사진을 남겨 주세요. <span id="jSum">'+(bad?'· 불량 <b class="req">'+bad+'</b>건':'')+'</span></p>'
+  +r.jointItems.map(([g,t],i)=>{const n=i+1,v=J.items[n]||'';const head=g!==grp?(grp=g,'<div class="stage">'+escapeText(g)+'</div>'):'';
+   return head+'<div class="jitem'+(v==='BAD'?' bad':'')+'" id="ji_'+n+'"><div class="jq"><b>'+n+'.</b> '+escapeText(t)+'</div><div class="jm" role="radiogroup" aria-label="'+n+'번 점검 결과">'+Object.entries(MARK).map(([k,l])=>'<label class="jb '+k.toLowerCase()+'"><input type="radio" name="ji'+n+'" value="'+k+'" '+(v===k?'checked':'')+' '+dis+' onchange="jointMark('+n+')"><span>'+l+'</span></label>').join('')+'</div><div id="jbx_'+n+'">'+(v==='BAD'?badBox(n,dis):'')+'</div></div>'}).join('')+'</div>'}
+function jointMark(n){collectDocs();const v=room.joint.items[n],el=$('ji_'+n);el.classList.toggle('bad',v==='BAD');el.classList.remove('miss','shake');$('jbx_'+n).innerHTML=v==='BAD'?badBox(n,''):'';if(v==='BAD')setTimeout(()=>$('f_jm'+n)?.focus(),50);
+ const bad=Object.values(room.joint.items).filter(x=>x==='BAD').length;$('jSum').innerHTML=bad?'· 불량 <b class="req">'+bad+'</b>건':''}
+async function addPhoto(n){const inp=$('jf_'+n),f0=inp.files[0];if(!f0)return;try{const f=await readFile(f0);const r=await call('uploadMeetingPhoto',room.id,n,f);collectDocs();const nt=room.joint.notes[n]=room.joint.notes[n]||{memo:'',photos:[]};nt.photos=(nt.photos||[]).concat(r.id).slice(0,5);photoPrev[r.id]='data:'+f.mime+';base64,'+f.data;$('jbx_'+n).innerHTML=badBox(n,'');msg(n+'번 사진을 올렸습니다. [임시 저장]을 눌러 보관하세요.')}catch(e){alert(e.message)}finally{inp.value=''}}
+async function viewPhoto(id){if(photoPrev[id]){const w=window.open();if(w)w.document.write('<img src="'+photoPrev[id]+'" style="max-width:100%">');return}try{const f=await call('getMeetingPhoto',room.id,id);photoPrev[id]='data:'+f.mime+';base64,'+f.data;const w=window.open();if(w)w.document.write('<img src="'+photoPrev[id]+'" style="max-width:100%">')}catch(e){}}
+/* ③ 협의체 회의록: 참석 자동, 발의내용 = 법정 협의사항 고정, 심의결과 = 합동점검 지적사항 자동 */
+function resultsLines(){const J=room.joint,bad=Object.entries(J.items).filter(([,v])=>v==='BAD').map(([n])=>Number(n)).sort((p,q)=>p-q);
+ if(!(room.kindCodes||[]).includes('JOINT'))return ['협의사항 공유, 특이사항 없음'];
+ return bad.length?bad.map(n=>'[합동점검 지적] '+n+'. '+room.jointItems[n-1][1]+' → 불량'+(J.notes[n]?.memo?': '+J.notes[n].memo:' (메모 작성 필요)')):['합동안전보건점검 결과 특이사항 없음 (종결)']}
+function refreshResults(){if($('mResList'))$('mResList').innerHTML=resultsLines().map(x=>'<li>'+escapeText(x)+'</li>').join('')}
+function councilPanel(r){const M=r.minutes,dis=r.done?'disabled':'';
+ return '<div class="card"><h2>협력사 협의체 회의록</h2><table class="rtable"><tr><th>현장명</th><td>'+escapeText(r.job.storeName)+'</td><th>회의구분</th><td><label><input type="radio" name="mType" value="정기" '+(M.type==='정기'?'checked':'')+' '+dis+'> 정기</label> <label><input type="radio" name="mType" value="임시" '+(M.type!=='정기'?'checked':'')+' '+dis+'> 임시</label></td></tr>'
+  +'<tr><th>일 시</th><td colspan="3">'+escapeText(r.date)+' <input type="time" id="f_mStart" value="'+escapeText(M.start)+'" '+dis+' aria-label="시작 시각"> ~ <input type="time" id="f_mEnd" value="'+escapeText(M.end)+'" '+dis+' aria-label="종료 시각"></td></tr>'
+  +'<tr><th>참석 인원<br>도급인</th><td colspan="3" class="jStaff">'+escapeText(staffNames(r))+'</td></tr><tr><th>수급인</th><td colspan="3" class="jVendor">'+vendorNamesHtml(r)+'</td></tr></table>'
+  +'<p class="muted" style="margin:6px 0 0">참석 인원은 QR 참석 체크에서 자동으로 들어옵니다.</p>'
+  +'<div class="stage">발 의 내 용 <span class="muted">(법정 협의사항 · 산업안전보건법 시행규칙 제79조)</span></div><ol class="rules">'+(r.agenda||[]).map(x=>'<li>'+escapeText(x)+'</li>').join('')+'</ol>'
+  +'<div class="stage">심 의 결 과 <span class="muted">(합동점검 결과에서 자동)</span></div><ol class="rules" id="mResList">'+resultsLines().map(x=>'<li>'+escapeText(x)+'</li>').join('')+'</ol>'
+  +'<div class="field"><label for="f_mEtc">기타사항 <span class="muted">(업체 의견 등, 선택)</span></label><textarea id="f_mEtc" '+dis+' style="min-height:70px">'+escapeText(M.etc||'')+'</textarea></div></div>'}
+function footPanel(r){if(!(r.kindCodes||[]).length)return '';return '<div class="card roomfoot">'+(r.done?'<button class="button ghost" type="button" onclick="reopenDocs()">완료 취소 (내용 고치기)</button>'
+ :'<div class="row"><button class="button ghost" type="button" style="flex:1" onclick="saveDocs()">임시 저장</button><button class="button" type="button" style="flex:2" onclick="doneMeeting()">미팅 실시 완료</button></div>')+'</div>'}
 /** 화면 입력값 모으기 (room에도 반영) */
-function collectDocs(){if(!room)return null;const r=room,items={};(r.jointItems||[]).forEach((_,i)=>{const v=document.querySelector('input[name=ji'+(i+1)+']:checked');if(v)items[i+1]=v.value});
- const opinions={};document.querySelectorAll('.opin').forEach(x=>{if(x.value.trim())opinions[x.dataset.id]=x.value.trim()});
- const d={joint:{items,actions:value('jActions'),opinions},minutes:{type:document.querySelector('input[name=mType]:checked')?.value||'임시',start:value('mStart'),end:value('mEnd'),proposals:value('mProp'),results:value('mRes'),etc:value('mEtc')}};
- if($('jointCard'))r.joint=d.joint;if($('minCard'))r.minutes=d.minutes;return d}
-/** 회의록 자동 작성 (규칙 기반): 발의=위험정보 공유·점검결과 공유·업체 의견 / 심의=불량 항목별 조치 / 기타=해당없음 수·참석 */
-function autoMinutes(){const r=room,d=collectDocs(),J=d.joint,it=r.jointItems,K=r.kindCodes||[];
- const has=($('f_mProp').value+$('f_mRes').value+$('f_mEtc').value).trim();if(has&&!confirm('지금 적힌 발의내용·심의결과·기타사항을 자동 작성 내용으로 바꿀까요?'))return;
- const prop=['착수 전 위험정보 및 작업 일정 공유'];if(K.includes('JOINT'))prop.push('합동안전보건점검 결과 공유');
- r.vendors.forEach(v=>{if(J.opinions[v.companyId])prop.push(v.company+' 의견: '+J.opinions[v.companyId])});
- const bad=Object.entries(J.items).filter(([,v])=>v==='BAD').map(([n])=>Number(n));
- const res=bad.length?bad.map(n=>n+'. '+it[n-1][1].replace(/\?$/,'')+' — 불량 → 조치: '+(J.actions||'(조치사항 작성 필요)')):[K.includes('JOINT')?'합동점검 결과 전 항목 양호, 현 안전조치 유지':'공유 내용 확인, 현 안전조치 유지'];
- const na=Object.values(J.items).filter(v=>v==='NA').length,vs=r.vendors.filter(v=>r.attendees.some(x=>x.side==='VENDOR'&&x.companyId===v.companyId&&x.status==='OK')).length,ppl=r.attendees.filter(x=>x.status==='OK').length;
- $('f_mProp').value=prop.join('\n');$('f_mRes').value=res.join('\n');$('f_mEtc').value=(K.includes('JOINT')?'합동점검 해당없음 '+na+'개 · ':'')+'참석 업체 '+vs+'곳 / '+r.vendors.length+'곳 · 참석 인원 '+ppl+'명';msg('자동 작성했습니다. 필요하면 고친 뒤 저장해 주세요.')}
-async function saveDocs(){const d=collectDocs();try{const x=await call('saveMeetingDocs',room.id,d);showRoom(x);msg('임시 저장했습니다.')}catch(e){}}
-/** 실시 완료: 화면에서 먼저 빠진 칸 확인 → 그 칸으로 이동 + 붉은 테두리·흔들림 */
-async function doneMeeting(){const d=collectDocs(),r=room,K=r.kindCodes||[],miss=[];
- if(K.includes('JOINT')){r.jointItems.forEach((_,i)=>{if(!d.joint.items[i+1])miss.push('ji_'+(i+1))});if(Object.values(d.joint.items).includes('BAD')&&!d.joint.actions)miss.push('f_jActions')}
- if(K.includes('COUNCIL')&&!d.minutes.proposals)miss.push('f_mProp');
- if(miss.length){document.querySelectorAll('.miss').forEach(x=>x.classList.remove('miss','shake'));miss.forEach(id=>{const el=$(id);if(!el)return;el.classList.add('miss');void el.offsetWidth;el.classList.add('shake')});const f=$(miss[0]);f&&f.scrollIntoView({behavior:'smooth',block:'center'});
-  msg(miss.some(x=>x.startsWith('ji_'))?'체크하지 않은 점검 항목 '+miss.filter(x=>x.startsWith('ji_')).length+'개 · 빨간 칸을 확인해 주세요':miss[0]==='f_jActions'?'불량 항목의 조치사항을 적어 주세요':'회의록 발의내용을 적어 주세요 ([점검 결과로 자동 작성] 사용 가능)');return}
+function collectDocs(){if(!room||!$('roomDocs')||room.done)return room?{joint:room.joint,minutes:room.minutes}:null;const r=room;
+ if($('rp_joint')){const items={},notes={};r.jointItems.forEach((_,i)=>{const n=i+1,v=document.querySelector('input[name=ji'+n+']:checked');items[n]=v?v.value:'';if(items[n]==='BAD'){const old=r.joint.notes[n]||{};const m=$('f_jm'+n);notes[n]={memo:m?m.value.trim():(old.memo||''),photos:old.photos||[]}}});r.joint={items,notes}}
+ if($('rp_council'))r.minutes={type:document.querySelector('input[name=mType]:checked')?.value||'임시',start:value('mStart'),end:value('mEnd'),etc:value('mEtc')};
+ return {joint:r.joint,minutes:r.minutes}}
+async function saveDocs(){const d=collectDocs();try{showRoom(await call('saveMeetingDocs',room.id,d));msg('임시 저장했습니다.')}catch(e){}}
+/** 실시 완료: 빠진 곳이 있으면 그 탭으로 이동 → 칸 붉은 테두리·흔들림 */
+async function doneMeeting(){const d=collectDocs(),r=room,K=r.kindCodes||[];
+ if(!okAtt(r).some(x=>x.side==='VENDOR')){setRoomTab('att');msg('참석한 협력업체가 없습니다. QR로 참석 체크를 받아 주세요.');return}
+ if(r.attendees.some(x=>x.status==='PENDING')){setRoomTab('att');msg('확인 대기 참석자를 [확인] 또는 [제외]해 주세요.');return}
+ if(K.includes('JOINT')){const miss=[];r.jointItems.forEach((_,i)=>{const n=i+1;if(!d.joint.items[n])miss.push('ji_'+n);else if(d.joint.items[n]==='BAD'&&!d.joint.notes[n]?.memo)miss.push('f_jm'+n)});
+  if(miss.length){setRoomTab('joint');document.querySelectorAll('.miss').forEach(x=>x.classList.remove('miss','shake'));miss.forEach(id=>{const el=$(id);if(!el)return;el.classList.add('miss');void el.offsetWidth;el.classList.add('shake')});setTimeout(()=>{const f=$(miss[0]);f&&f.scrollIntoView({behavior:'smooth',block:'center'});if(f&&f.tagName==='INPUT')f.focus({preventScroll:true})},50);msg(miss[0].startsWith('f_jm')?'불량 항목의 지적 내용·조치를 적어 주세요':'체크하지 않은 점검 항목이 있습니다');return}}
  if(!confirm('미팅 실시를 완료할까요?\n방이 닫히고 점검표·회의록이 확정됩니다. (고칠 때는 [완료 취소])'))return;
  try{const x=await call('completeMeeting',r.id,d);showRoom(x);window.scrollTo(0,0);msg('미팅 실시 완료로 확정했습니다.')}catch(e){alert(e.message)}}
 async function reopenDocs(){if(!confirm('실시 완료를 취소하고 내용을 고칠까요?'))return;try{showRoom(await call('reopenMeetingDocs',room.id))}catch(e){}}

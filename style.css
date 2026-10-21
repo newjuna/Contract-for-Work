@@ -81,3 +81,8 @@ body{background:var(--bg);color:var(--text);font:15px/1.6 "Pretendard","Malgun G
 .jb.ok input:checked+span{background:var(--okbg);border-color:var(--ok);color:var(--ok)}.jb.bad input:checked+span{background:#fdecec;border-color:var(--accent);color:var(--accent)}.jb.na input:checked+span{background:var(--bg);border-color:#6b7280;color:#374151}
 .jb input:focus-visible+span{outline:2px solid var(--main);outline-offset:1px}.jb input:disabled+span{cursor:default}
 .rtable input[type=time]{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit}
+/* ===== v4.6 미팅 방 탭 · 불량 메모/사진 · 아래 고정 버튼 ===== */
+.jbad{margin-top:10px;padding:10px;border-radius:8px;background:#fff;border:1px dashed var(--accent)}.jbad label{font-size:13px;font-weight:700;display:block;margin-bottom:6px}
+.jbad input.jmemo{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit}
+.jph{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+.roomfoot{position:sticky;bottom:8px;z-index:5;box-shadow:0 6px 20px #0000001a}
