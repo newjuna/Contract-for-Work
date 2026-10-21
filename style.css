@@ -86,3 +86,13 @@ body{background:var(--bg);color:var(--text);font:15px/1.6 "Pretendard","Malgun G
 .jbad input.jmemo{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font:inherit}
 .jph{width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
 .roomfoot{position:sticky;bottom:8px;z-index:5;box-shadow:0 6px 20px #0000001a}
+/* ===== v4.7 안전작업허가서 ===== */
+.split3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px}
+.pchips{display:flex;gap:6px;flex-wrap:wrap}.pchip{position:relative;cursor:pointer}.pchip input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.pchip span{display:inline-block;padding:7px 12px;border:1px solid var(--line);border-radius:999px;font-size:13px;font-weight:600;color:var(--sub);background:#fff;white-space:nowrap}
+.pchip input:checked+span{background:var(--main);border-color:var(--main);color:#fff}.pchip input:focus-visible+span{outline:2px solid var(--main);outline-offset:1px}.pchip input:disabled+span{cursor:default;opacity:.85}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;margin:6px 0;font-size:14px;background:#fff}
+.psupp{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}.psupp.on{border-color:var(--main);background:#fafafa}
+.psw{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px}.psw input{width:20px;height:20px;accent-color:var(--main)}
+.pgas{display:grid;grid-template-columns:40px repeat(3,1fr);gap:0 8px;align-items:end;border-top:1px solid var(--line);padding-top:6px;margin-top:6px}.pgas>b{align-self:center}
+@media(max-width:650px){.split3{grid-template-columns:1fr}.pgas{grid-template-columns:1fr 1fr}.pgas>b{grid-column:1/-1}.prow{flex-direction:column;align-items:flex-start}}
