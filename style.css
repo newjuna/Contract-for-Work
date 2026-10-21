@@ -68,3 +68,8 @@ body{background:var(--bg);color:var(--text);font:15px/1.6 "Pretendard","Malgun G
 .gearbtn{width:40px;height:40px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:19px;line-height:1;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center}.gearbtn:hover{background:var(--bg)}
 /* ===== v4.2 삭제 버튼 ===== */
 .button.danger{color:var(--accent)}.button.danger:hover{background:#fff5f5}
+/* ===== v4.3 알림 숫자 (메뉴·☰ 버튼) ===== */
+.drawer .tabs button[data-n]::after,.menubtn[data-n]::after{content:attr(data-n);display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--accent);color:#fff;font-size:11px;font-weight:700;line-height:1}
+.drawer .tabs button[data-n]{display:flex;justify-content:space-between;align-items:center}
+.menubtn{position:relative}.menubtn[data-n]::after{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;font-size:10px;padding:0 5px;box-shadow:0 0 0 2px #fff}
+.alertcard{border-left:3px solid var(--accent)}.cnt{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--accent);color:#fff;font-size:12px;vertical-align:2px;margin-left:4px}
