@@ -6,7 +6,7 @@ let rd=null,sigDirty=false;
 /* ---------- 계약 전 화면의 규정 카드 ---------- */
 function ruleCardHtml(r,opt){const latest=r.uploads[0],ok=!!latest;
  return '<div class="dcard '+(ok?'ok':'mine')+'" id="row_docC01"><div class="dhead"><b>'+escapeText(r.name)+'</b><span class="badges">'+(r.required?'<span class="reqtag">필수</span>':'')+(ok?'<span class="done">✔ 작성 완료</span>':'<span class="none">미작성</span>')+'</span></div>'
-  +'<div class="muted">워드 파일 없이 휴대폰에서 작성합니다. 3칸 입력 + 대표이사 서명이면 끝납니다.</div>'
+  +'<div class="muted">휴대폰에서 3칸 입력 + 서명</div>'
   +'<div class="dact">'+(ok?'<button class="dbtn ghost" type="button" onclick="viewFile(\''+escapeText(latest.id)+'\')">📄 문서 보기</button>':'')
   +(r.canUpload?'<button class="dbtn main" type="button" onclick="openRule()">'+(ok?'✍ 다시 작성':'✍ 작성하기')+'</button>':'<span class="muted">'+escapeText(opt.lockMsg||'')+'</span>')+'</div>'
   +(r.uploads.length>1?'<details class="hist"><summary>이전 작성본 '+(r.uploads.length-1)+'건</summary>'+r.uploads.slice(1).map(u=>'<div><a onclick="viewFile(\''+escapeText(u.id)+'\')">v'+escapeText(u.version)+' · '+escapeText(u.name)+'</a> <span class="muted">'+escapeText(fmtTime(u.uploadedAt))+'</span></div>').join('')+'</details>':'')+'</div>'}
@@ -21,7 +21,7 @@ function openRule(){const F=state.forms,b=state.company,prev=(F.C01&&F.C01.data)
   +'<div class="field"><label for="f_rdate">시행일 <span class="req">*</span></label><input id="f_rdate" type="date" value="'+escapeText(rd.date)+'" oninput="ruleIn()"></div></div>'
   +'<div class="card cdoc"><div class="stage" style="margin-top:0">② 완성될 문서 미리보기</div><div id="ruleDoc">'+ruleDocHtml()+'</div></div>'
   +'<div class="card" id="sigBox"><h2>③ 대표이사 서명 <span class="req">*</span></h2><p class="desc">아래 칸에 손가락으로 서명해 주세요.</p><canvas id="sigPad" class="sigpad" aria-label="서명 칸 (손가락으로 서명)"></canvas><div class="row" style="justify-content:space-between;margin-top:8px"><span class="muted">"을" '+escapeText(b.company)+' 대표이사</span><button class="button ghost" type="button" onclick="clearSig()">다시 쓰기</button></div></div>'
-  +'<div class="card roomfoot"><button class="button" type="button" style="width:100%" onclick="saveRuleNow()">서명하고 작성 완료</button></div></div>';
+  +'<div class="card roomfoot"><button class="button" id="ruleSave" type="button" style="width:100%" onclick="saveRuleNow()">서명하고 작성 완료</button></div></div>';
  el.style.display='block';document.body.style.overflow='hidden';el.scrollTop=0;initSig()}
 function closeRule(){const el=$('csheet');if(el)el.style.display='none';document.body.style.overflow='';rd=null}
 function ruleIn(){rd.hqRep=value('rhq');rd.vendorRep=value('rrep');rd.date=value('rdate');$('ruleDoc').innerHTML=ruleDocHtml();['f_rhq','f_rrep','f_rdate'].forEach(id=>$(id).classList.remove('miss','shake'))}
@@ -43,4 +43,5 @@ function sigData(){const c=$('sigPad'),w=Math.min(600,c.width),h=Math.round(c.he
 async function saveRuleNow(){ruleIn();const miss=[];if(!rd.hqRep)miss.push('f_rhq');if(!rd.vendorRep)miss.push('f_rrep');if(!rd.date)miss.push('f_rdate');if(!sigDirty)miss.push('sigBox');
  if(miss.length){inspFlag(miss,miss[0]==='sigBox'?'대표이사 서명을 해 주세요':'빨간 칸을 채워 주세요');return}
  if(!confirm('안전보건관리규정을 작성 완료할까요?\n\n"갑" '+state.forms.hq+' 현장대리인 '+rd.hqRep+'\n"을" '+state.company.company+' 대표이사 '+rd.vendorRep+'\n시행일 '+rd.date+'\n\n서명이 들어간 PDF가 만들어져 제출 서류로 등록됩니다.'))return;
- try{const s=await call('saveRuleDoc',{hqRep:rd.hqRep,vendorRep:rd.vendorRep,date:rd.date},sigData());closeRule();display(s);setTimeout(()=>$('row_docC01')?.scrollIntoView({block:'center'}),100);msg('안전보건관리규정 작성 완료 · 제출 서류로 등록했습니다.')}catch(e){}}
+ const btn=$('ruleSave');if(btn){btn.disabled=true;btn.textContent='문서를 만드는 중… (10초 정도)'}
+ try{const s=await call('saveRuleDoc',{hqRep:rd.hqRep,vendorRep:rd.vendorRep,date:rd.date},sigData());closeRule();display(s);setTimeout(()=>$('row_docC01')?.scrollIntoView({block:'center'}),100);msg('안전보건관리규정 작성 완료 · 제출 서류로 등록했습니다.')}catch(e){if(btn){btn.disabled=false;btn.textContent='서명하고 작성 완료'}}}
