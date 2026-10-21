@@ -73,3 +73,11 @@ body{background:var(--bg);color:var(--text);font:15px/1.6 "Pretendard","Malgun G
 .drawer .tabs button[data-n]{display:flex;justify-content:space-between;align-items:center}
 .menubtn{position:relative}.menubtn[data-n]::after{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;font-size:10px;padding:0 5px;box-shadow:0 0 0 2px #fff}
 .alertcard{border-left:3px solid var(--accent)}.cnt{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:11px;background:var(--accent);color:#fff;font-size:12px;vertical-align:2px;margin-left:4px}
+/* ===== v4.5 합동점검표 · 회의록 ===== */
+.jitem{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:6px 0;background:#fff}.jitem.bad{border-color:var(--accent);background:#fff8f8}
+.jq{font-size:14px;line-height:1.55}.jm{display:flex;gap:6px;margin-top:8px}
+.jb{flex:1;position:relative;cursor:pointer}.jb input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.jb span{display:block;text-align:center;padding:9px 4px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;color:var(--sub);background:#fff}
+.jb.ok input:checked+span{background:var(--okbg);border-color:var(--ok);color:var(--ok)}.jb.bad input:checked+span{background:#fdecec;border-color:var(--accent);color:var(--accent)}.jb.na input:checked+span{background:var(--bg);border-color:#6b7280;color:#374151}
+.jb input:focus-visible+span{outline:2px solid var(--main);outline-offset:1px}.jb input:disabled+span{cursor:default}
+.rtable input[type=time]{padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit}
