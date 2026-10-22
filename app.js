@@ -1,5 +1,6 @@
 /* 도급 안전관리 화면 (GitHub). 서버 기능은 Apps Script Code.gs */
 // v4.0 세션 값: 로그인 후 브라우저 탭 저장소(sessionStorage)에 보관 · 링크값: 주소창 ?review= (영문·숫자·- 만)
+(function(){const q=new URLSearchParams(location.search),u=(window.APP_CONFIG||{}).APPS_SCRIPT_URL||'';for(const k of ['eval','approve']){const t=(q.get(k)||'').toLowerCase();if(/^[a-f0-9]{64}$/.test(t)&&/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(u)){document.documentElement.innerHTML='<p style="font:16px sans-serif;margin:40px">검토 화면을 여는 중입니다…</p>';location.replace(u+'?'+k+'='+t);throw Error('redirect')}}})();
 let SESSION='';try{SESSION=sessionStorage.getItem('dsk')||''}catch(e){}
 const LINK_REVIEW=(new URLSearchParams(location.search).get('review')||'').replace(/[^A-Za-z0-9-]/g,'').slice(0,40);
 let state=null,activeStep=1,saveTimer=null,dirty=false,tab='my',reviewing=null;
@@ -19,7 +20,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.21 v5.6';
+const UI_VERSION='26.10.21 v5.7';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
