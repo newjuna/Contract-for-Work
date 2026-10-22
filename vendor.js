@@ -22,7 +22,7 @@ function vgo(m,id){if(!id&&VJOB_MENUS.includes(m)&&vOpenJobs()<1)m='dash';/* 진
  if(m==='meet'){renderVMeet();return}
  if(m==='dash'){vjob=null;loadMyJobs();return}if(m==='docs'){renderVDocs();return}if(m==='drill'){renderVDrill();return}vEnsureJob()}
 /** 승인 후 화면 시작 (renderMy에서 호출) */
-function vStart(){markVMenu();if(vmenu==='meet')return renderVMeet();if(vmenu==='docs')return renderVDocs();if(vmenu==='drill')return renderVDrill();if(vmenu!=='dash'&&vjob)return renderVJob();loadMyJobs()}
+function vStart(){markVMenu();if(vmenu==='meet')return renderVMeet();if(vmenu==='docs')return renderVDocs();if(vmenu==='drill')return renderVDrill();if(vmenu!=='dash'&&vjob)return renderVJob();loadMyJobs(true)/* v5.18 20초 안에 받은 목록이면 다시 받지 않음 */}
 async function vEnsureJob(){const el=$('execArea');if(!el)return;
  if(!vjobs){el.innerHTML='<div class="card"><p class="desc">공사를 불러오는 중입니다…</p></div>';try{vjobs=await callQuiet('myJobs')}catch(e){el.innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사를 불러오지 못했습니다.')+'</p></div>';return}}
  const jobs=vjobs.jobs;if(!jobs.length){el.innerHTML='<div class="card"><h2>'+escapeText(VMENU[vmenu])+'</h2><div class="note">아직 배정된 공사가 없습니다.<br>도급인 담당자가 공사에 업체를 배정하면 여기에서 진행할 수 있습니다.</div></div>';return}
@@ -50,7 +50,9 @@ function todoRows(j,t){const S=j.stats||{},inRange=j.startDate<=t&&(!j.endDate||
  if(S.openFindings)list.push(['insp','미조치 지적사항',S.openFindings+'건']);
  if(!list.length)return '<div class="note" style="margin-top:12px">✔ 오늘 할 일을 모두 마쳤습니다.</div>';
  return '<div class="stage">오늘 할 일</div>'+list.map(([m,txt,tag])=>'<button class="vtodo" type="button" onclick="vgo(\''+m+'\',\''+id+'\')"><span>'+escapeText(txt)+'</span><span class="req">'+escapeText(tag)+' ›</span></button>').join('')}
-function renderDash(){const el=$('execArea');if(!el||!vjobs)return;clearTimeout(window.__pf);window.__pf=setTimeout(()=>vjobs.jobs.filter(j=>j.status!=='ENDED').slice(0,3).forEach((j,i)=>setTimeout(()=>callQuiet('vendorJob',j.id).catch(()=>{}),i*400)),800);vjob=null;clearInterval(wkTimer);const d=vjobs,t=d.today,act=d.jobs.filter(j=>j.status!=='ENDED'),ended=d.jobs.filter(j=>j.status==='ENDED');
+function renderDash(){const el=$('execArea');if(!el||!vjobs)return;
+ // v5.18 공사 화면 미리 받기는 5분에 한 번만 (예전: 대시보드를 그릴 때마다 3번씩 → 다음 버튼과 겹쳐 느려짐)
+ clearTimeout(window.__pf);if(!window.__pfAt||Date.now()-window.__pfAt>300000)window.__pf=setTimeout(()=>{window.__pfAt=Date.now();vjobs.jobs.filter(j=>j.status!=='ENDED').slice(0,3).forEach((j,i)=>setTimeout(()=>callQuiet('vendorJob',j.id).catch(()=>{}),i*600))},1500);vjob=null;clearInterval(wkTimer);const d=vjobs,t=d.today,act=d.jobs.filter(j=>j.status!=='ENDED'),ended=d.jobs.filter(j=>j.status==='ENDED');
  const due=act.reduce((n,j)=>n+((j.stats&&j.stats.inspDue&&!j.stats.inspToday&&j.startDate<=t)?1:0)+((j.stats&&j.stats.openFindings)||0),0);setBadge($('vm_insp'),due);setBadge($('menuBtn'),due);
  // v5.17 계약 전 평가 유효기간 30일 이내·만료·재평가 중이면 대시보드 위에 안내
  const cb=state.company||{},cv=cb.valid,rn=cb.renewAt?{DRAFT:'작성 중',CORRECTION:'보완 요청',SUBMITTED:'본사 검토 중',SAFETY_REVIEW:'본사 검토 중'}[cb.submissionStatus]||'진행 중':'';
