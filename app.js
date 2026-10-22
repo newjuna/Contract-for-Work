@@ -36,7 +36,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.22 v5.16';
+const UI_VERSION='26.10.22 v5.17';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -50,9 +50,12 @@ else if(b.status==='VERIFIED'){activeStep=1;html=vendorHomeHtml(b)}$('my').inner
  // 승인 대기 중일 때만 15초마다 승인 여부 자동 확인
  clearInterval(pollTimer);if(b&&b.status==='PENDING')pollTimer=setInterval(()=>checkApproval(false),15000);
  if(b&&b.status==='VERIFIED'&&['SUBMITTED','SAFETY_REVIEW'].includes(b.submissionStatus))pollTimer=setInterval(checkReview,30000);
- if(b&&b.status==='VERIFIED'&&b.submissionStatus==='APPROVED'){showApprovedOnce(b);vStart()}}
+ if(b&&b.status==='VERIFIED'&&(b.submissionStatus==='APPROVED'||b.renewAt)){if(b.submissionStatus==='APPROVED')showApprovedOnce(b);vStart()}}
 /* 계약 전 검토 상태 자동 확인 */
-async function checkReview(){try{const s=await callQuiet('myStatus');if(s&&s.submissionStatus!==state.company.submissionStatus){clearInterval(pollTimer);await reload();}}catch(e){}}
+async function checkReview(){try{const s=await callQuiet('myStatus');if(s&&s.submissionStatus!==state.company.submissionStatus){
+ // v5.17 재평가 검토 중에는 공사 업무를 하고 있을 수 있음 → 작업 중이면 화면을 바꾸지 않고 알림만 (다음 확인 때 다시)
+ if(state.company.renewAt&&busyView()){if(window.__rvSeen===s.submissionStatus)return;window.__rvSeen=s.submissionStatus;msg(s.submissionStatus==='APPROVED'?'계약 전 서류 재평가가 승인되었습니다.':'계약 전 서류 재평가 결과가 나왔습니다. [계약 서류] 메뉴에서 확인해 주세요.');return}
+ clearInterval(pollTimer);await reload();if(state.company&&state.company.submissionStatus==='APPROVED'&&s.submissionStatus==='APPROVED')msg('계약 전 서류 승인 완료');}}catch(e){}}
 /* 승인 안내 팝업: 업체당 한 번만 */
 function showApprovedOnce(b){const key='approvedSeen:'+b.id;let seen=false;try{seen=localStorage.getItem(key)==='1'}catch(e){}if(seen||window.__approvedShown)return;window.__approvedShown=true;popup('계약 전 검토가 완료되었습니다','본사 담당자 검토를 통과했습니다.\n첫 화면에서 공사 일정과 오늘 할 일을 확인하고, ☰ 메뉴에서 작업자 등록·작업허가서·순회점검을 진행해 주세요.','시작하기',()=>{try{localStorage.setItem(key,'1')}catch(e){}window.scrollTo(0,0)})}
 /* ---------- 승인 대기 자동 확인 + 안내 팝업 ---------- */
@@ -92,7 +95,7 @@ function saveBlob(f){const bytes=atob(f.data),buf=new Uint8Array(bytes.length);f
 async function downloadTemplate(code){try{const r=await call('getTemplate',code);if(r.url){const a=document.createElement('a');a.href=r.url;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();msg('새 창에서 샘플 양식을 내려받습니다. 안 열리면 팝업 차단을 해제해 주세요.')}else saveBlob(r)}catch(e){}}
 async function uploadDoc(code){if(dirty&&!await save(false))return;const name=((state.docBoard.rows||state.docBoard.contract).find(t=>t.code===code)||{}).name||code;let f;try{f=await readFile($('doc_'+code).files[0])}catch(e){alert(e.message);return}if(!confirm(name+' 작성본으로 "'+f.name+'" 파일을 등록할까요?'))return;try{display(await call('uploadContractDoc',code,f));msg(name+' 등록 완료');
  // 필수 서류가 모두 올라오면 바로 제출할지 묻기 → 제출 시 본사 1차 검토 메일 자동 발송
- const rows=(state.docBoard&&state.docBoard.rows)||[],req=rows.filter(r=>r.vendorDoc&&r.stage==='CONTRACT'&&r.required);
+ const rows=renewRows((state.docBoard&&state.docBoard.rows)||[]),req=rows.filter(r=>r.vendorDoc&&r.stage==='CONTRACT'&&r.required);
  if(req.length&&req.every(r=>r.uploads.length)&&['DRAFT','CORRECTION'].includes(state.company.submissionStatus)&&confirm('필수 서류가 모두 올라왔습니다.\n지금 제출하면 본사 담당자에게 1차 검토 요청이 바로 전달됩니다. 제출할까요?'))await submitAll();
 }catch(e){}}
 /* ---------- v2.1 [관리자] 표준양식 관리 ---------- */
@@ -108,8 +111,14 @@ function testSample(){const n=String(Math.floor(Math.random()*1e10)).padStart(10
 const SUB_LABEL={DRAFT:'작성 중',CORRECTION:'보완 요청',SUBMITTED:'제출 완료 · 본사 1차 검토 중',SAFETY_REVIEW:'안전보건팀 확인 중',APPROVED:'계약 전 검토 승인'};
 function vendorHomeHtml(b){
  const st=b.submissionStatus||'DRAFT';
- return st==='APPROVED'?executionHomeHtml(b):contractHomeHtml(b);
+ // v5.17 재평가 중(이전 승인 있음)이면 수행 화면 유지 · 계약 서류 메뉴에서 고쳐서 다시 제출
+ return st==='APPROVED'||b.renewAt?executionHomeHtml(b):contractHomeHtml(b);
 }
+/** v5.17 재평가 중이면 재평가 시작 뒤에 다시 작성·등록한 서류만 '완료'로 봄 */
+function renewRows(rows,b){b=b||(state&&state.company);return b&&b.renewAt?rows.map(r=>Object.assign({},r,{uploads:(r.uploads||[]).filter(u=>String(u.uploadedAt)>=String(b.renewAt))})):rows}
+/** v5.17 계약 전 평가 유효기간 안내 (업체 화면) */
+function validNote(b){const v=b&&b.valid;if(!v)return '';const warn=v.expired||v.days<=30;
+ return '<div class="note'+(warn?' warnnote':'')+'" style="margin-top:10px'+(warn?';border-left:3px solid var(--accent)':'')+'"><b>계약 전 평가 유효기간</b> · '+escapeText(v.from)+' ~ '+escapeText(v.until)+' '+(v.expired?'<b class="req">만료</b><br>새 공사에 배정되려면 계약 전 서류를 고쳐서 다시 제출해 주세요. (진행 중인 공사는 계속 진행할 수 있습니다)':v.days<=30?'<b class="req">D-'+v.days+'</b><br>기간이 끝나면 새 공사에 배정될 수 없습니다. 미리 고쳐서 다시 제출해 주세요.':'(D-'+v.days+')')+'</div>'}
 /* 공통: 상단 업체 카드 + 진행 단계 */
 function headCard(b,st,todo,pctHtml){
  const flow=['정보·서류 작성','제출','본사 1차 검토','안전보건팀 확인','수행 단계'],cur={DRAFT:0,CORRECTION:0,SUBMITTED:2,SAFETY_REVIEW:3,APPROVED:4}[st]??0;
@@ -141,11 +150,12 @@ function contractHomeHtml(b){
  const st=b.submissionStatus||'DRAFT',locked=['SUBMITTED','SAFETY_REVIEW'].includes(st),correcting=st==='CORRECTION';
  const allowed=correcting?JSON.parse(b.correctionKeys||'[]'):[],dis=k=>locked||(correcting&&!allowed.includes('1:'+k));
  const data=(state.steps.find(x=>Number(x.step)===1)||{}).data||{},need=(state.fields[1]||[]).filter(([k])=>k!=='note');
- const rows=((state.docBoard&&state.docBoard.rows)||[]).filter(r=>r.stage==='CONTRACT'&&r.vendorDoc);
+ const rows=renewRows(((state.docBoard&&state.docBoard.rows)||[]).filter(r=>r.stage==='CONTRACT'&&r.vendorDoc),b);
  const req=rows.filter(r=>r.required),infoDone=need.filter(([k])=>String(data[k]||'').trim()).length,docDone=req.filter(r=>r.uploads.length).length;
  const total=need.length+req.length,pct=total?Math.round((infoDone+docDone)/total*100):0;
  const todo=st==='SUBMITTED'?'제출이 완료되었습니다. 본사 담당자가 서류를 검토하고 있습니다.':st==='SAFETY_REVIEW'?'1차 검토가 끝나 안전보건팀이 확인하고 있습니다. 승인되면 안내 창이 뜹니다.'
   :correcting?'본사에서 보완을 요청했습니다. 표시된 항목만 수정한 뒤 다시 제출해 주세요.'+(state.correctionNote?' · 보완 사유: '+state.correctionNote:'')
+  :b.renewAt?(pct<100?'재평가: 이전에 쓴 내용이 채워져 있습니다. ① 사업장 정보를 확인·수정하고 ② 규정·계획서를 [작성하기]로 다시 작성(서명)해 주세요.':'모든 항목이 준비되었습니다. 맨 아래 [제출하기]를 눌러 주세요. 승인되면 유효기간이 1년 연장됩니다.')
   :pct<100?'① 사업장 정보를 입력하고 ② 규정·계획서를 [작성하기]로 작성해 주세요.':'모든 항목이 준비되었습니다. 맨 아래 [제출하기]를 눌러 주세요.';
  const pctHtml='<div class="row" style="justify-content:space-between;margin-top:12px"><span class="muted">준비 상태 · 사업장 정보 '+infoDone+'/'+need.length+' · 서류 '+docDone+'/'+req.length+'</span><b style="color:#1b7442">'+pct+'%</b></div><div class="prog"><span style="width:'+pct+'%"></span></div>';
  const info='<div class="card"><h2>① 사업장 정보</h2><p class="muted">입력하면 자동 저장됩니다.</p><form id="stepForm" oninput="changed()" onsubmit="saveManual(event)">'+infoForm(b,dis)+'<div class="row" style="justify-content:space-between;margin-top:10px"><span class="statusline" id="saved">서버 저장 상태: -</span><button class="button ghost" type="submit" '+(locked?'disabled':'')+'>임시저장</button></div></form></div>';
@@ -189,7 +199,10 @@ async function delMeet(id){if(!confirm('이 미팅 방과 참석 기록을 삭�
 function renderJobsOld(){jobsMode='list';roomId='';clearInterval(roomTimer);const d=jobData;$('jobs').innerHTML='<div class="card"><div class="vh-top"><h2 style="margin:0">공사·현장미팅</h2><button class="button" type="button" onclick="jobForm()">+ 새 공사 만들기</button></div><p class="desc">공사를 만들고 참여 업체를 배정한 뒤, 현장 미팅 방을 만들어 QR로 참석을 받습니다.</p></div>'+waitCard()+(d.jobs.map(j=>'<div class="card"><div class="vh-top"><div><h2 style="margin:0">'+escapeText(j.title)+'</h2><div class="muted">'+escapeText(j.kindLabel)+' · '+escapeText(j.storeName)+(j.storeCode?' ('+escapeText(j.storeCode)+')':'')+' · '+escapeText(j.startDate)+(j.endDate?' ~ '+escapeText(j.endDate):'')+' · 주관 '+escapeText(j.hostName)+'</div></div><div class="row"><button class="button ghost" type="button" onclick="jobForm(\''+escapeText(j.id)+'\')">수정</button><button class="button ghost danger" type="button" onclick="delJob(\''+escapeText(j.id)+'\')">삭제</button></div></div><div class="desc" style="margin-top:8px"><b>참여 업체 '+j.vendors.length+'곳</b> · '+(j.vendors.map(v=>escapeText(v.company)+' <span class="muted">('+escapeText(v.trade)+')</span>').join(', ')||'없음')+'</div>'+jobEndHtml(j)+'<div class="line"></div><div class="row" style="justify-content:space-between"><b>작업허가서 <span class="muted">'+(j.permitTotal||0)+'건</span>'+(j.permitWaiting?' <span class="cnt">'+j.permitWaiting+'</span> <span class="req" style="font-size:13px">승인 대기</span>':'')+'</b><button class="button ghost" type="button" onclick="openPermitList(\''+escapeText(j.id)+'\')">작업허가서 보기</button></div><div class="row" style="justify-content:space-between;margin-top:8px"><b>순회점검일지 <span class="muted">'+(j.inspTotal||0)+'건</span>'+(j.inspUnchecked?' <span class="cnt">'+j.inspUnchecked+'</span> <span class="req" style="font-size:13px">확인 대기</span>':'')+(j.findOpen?' <span class="req" style="font-size:13px">· 미조치 '+j.findOpen+'</span>':'')+'</b><button class="button ghost" type="button" onclick="openInspList(\''+escapeText(j.id)+'\')">순회점검 보기</button></div><div class="line"></div><div class="row" style="justify-content:space-between"><b>현장 미팅</b><button class="button ghost" type="button" onclick="meetForm(\''+escapeText(j.id)+'\')">+ 미팅 방 만들기</button></div>'+(j.meetings.map(m=>'<div class="item"><div class="row" style="justify-content:space-between"><div><b>'+escapeText(m.title)+'</b> '+(m.done?'<span class="pill ok">✔ 실시 완료</span>':m.open?'<span class="pill ok">방 열림</span>':'<span class="pill todo">닫힘 · 실시 전</span>')+'<div class="muted">'+escapeText(m.date)+' '+escapeText(m.time||'')+' · '+escapeText(m.place)+' · 참석 '+m.count+'명'+(m.pending?' · <b style="color:#ce2a4b">확인 대기 '+m.pending+'</b>':'')+'</div></div><div class="row"><button class="button" type="button" onclick="openRoom(\''+escapeText(m.id)+'\')">방 들어가기</button><button class="button ghost danger" type="button" onclick="delMeet(\''+escapeText(m.id)+'\')">삭제</button></div></div></div>').join('')||'<p class="muted">아직 미팅 방이 없습니다.</p>')+'</div>').join('')||'<div class="card"><p class="desc">등록된 공사가 없습니다. [+ 새 공사 만들기]로 시작하세요.</p></div>')}
 function jobForm(id,preIds){jobsMode='form';const d=jobData,j=id?d.jobs.find(x=>x.id===id):null,dl=(j&&j.delegations)||{},sel=new Set((j?j.vendors:[]).map(v=>v.companyId).concat(preIds||[]));const dg=k=>dl[k]||{};
  $('jobs').innerHTML='<div class="card"><h2>'+(j?'공사 수정':'새 공사 만들기')+'</h2><form onsubmit="saveJobForm(event,\''+escapeText(id||'')+'\')"><div class="field"><label for="f_jKind">구분</label><select id="f_jKind">'+Object.entries(d.kinds).map(([k,v])=>'<option value="'+k+'" '+((j?j.kind:'WORK')===k?'selected':'')+'>'+escapeText(v)+'</option>').join('')+'</select></div><div class="split">'+input('jTitle','공사명',j?j.title:'','text',false,'예: 다이소 매봉역점 리뉴얼 공사')+input('jStore','매장명 (계약 단위면 계약명)',j?j.storeName:'','text',false,'예: 매봉역점')+input('jStart','공사 시작일',j?j.startDate:'','date')+input('jEnd','공사 종료일 (예정)',j?j.endDate:'','date')+'</div>'
- +'<div class="line"></div><h2 style="font-size:15px">참여 업체 배정</h2><p class="desc">계약 전 검토가 승인된 업체만 선택할 수 있습니다.'+(d.testMode?' <span class="req">[테스트 모드] 승인 전 업체도 표시</span>':'')+'</p>'+(d.vendors.map(v=>'<label class="desc" style="display:block;margin:6px 0"><input type="checkbox" class="jv" value="'+escapeText(v.id)+'" '+(sel.has(v.id)?'checked':'')+'> <b>'+escapeText(v.company)+'</b> · '+escapeText(v.industry)+(v.approved?'':' <span class="pill todo">승인 전</span>')+lastEvalHtml(v)+(j&&j.vendors.some(x=>x.companyId===v.id)?' <span class="muted">(배정됨)</span>':(preIds||[]).includes(v.id)?' <span class="pill ok">새 업체</span>':'')+'</label>').join('')||'<p class="muted">배정할 수 있는 업체가 없습니다.</p>')
+ +'<div class="line"></div><h2 style="font-size:15px">참여 업체 배정</h2><p class="desc">계약 전 검토가 승인된 업체만 선택할 수 있습니다.'+(d.testMode?' <span class="req">[테스트 모드] 승인 전 업체도 표시</span>':'')+'</p>'+(d.vendors.map(v=>{const has=!!(j&&j.vendors.some(x=>x.companyId===v.id)),lock=v.expired&&!has&&!d.testMode;/* v5.17 유효기간 지난 업체는 새로 배정 불가 */
+  return '<label class="desc" style="display:block;margin:6px 0'+(lock?';opacity:.6':'')+'"><input type="checkbox" class="jv" value="'+escapeText(v.id)+'" '+(sel.has(v.id)&&!lock?'checked':'')+(lock?' disabled':'')+'> <b>'+escapeText(v.company)+'</b> · '+escapeText(v.industry)+(v.approved?'':' <span class="pill todo">승인 전</span>')
+  +(v.expired?' <span class="pill todo">계약 전 평가 만료 ('+escapeText(v.valid.until)+')</span>'+(lock?'<span class="muted"> · 업체가 서류를 다시 제출해 승인받으면 배정 가능</span>':''):v.valid&&v.valid.days<=30?' <span class="pill todo">평가 유효 D-'+v.valid.days+'</span>':'')
+  +(v.renewing?' <span class="pill lock">재평가 '+escapeText({DRAFT:'작성 중',CORRECTION:'보완 중',SUBMITTED:'검토 중',SAFETY_REVIEW:'검토 중'}[v.renewStatus]||'진행 중')+'</span>':'')+lastEvalHtml(v)+(j&&j.vendors.some(x=>x.companyId===v.id)?' <span class="muted">(배정됨)</span>':(preIds||[]).includes(v.id)?' <span class="pill ok">새 업체</span>':'')+'</label>'}).join('')||'<p class="muted">배정할 수 있는 업체가 없습니다.</p>')
  +'<div class="line"></div><h2 style="font-size:15px">위임장 정보</h2><p class="desc">직인·도급인 서명란은 나중에 추가됩니다. 지금은 정보만 기록합니다.</p>'+['COUNCIL','JOINT'].map(k=>'<div class="stage">'+(k==='COUNCIL'?'산업안전보건 협의체 위임장':'합동안전보건점검 위임장')+'</div><div class="split">'+input('d'+k+'a','위임인 (예: 김기호 부사장)',dg(k).delegator)+input('d'+k+'b','수임인 (예: 최석건 팀장)',dg(k).delegatee)+input('d'+k+'c','위임일',dg(k).date,'date')+'</div>').join('')
  +'<div class="row" style="margin-top:12px"><button class="button" type="submit">저장</button><button class="button ghost" type="button" onclick="renderJobs()">취소</button></div></form></div>';window.scrollTo(0,0)}
 async function saveJobForm(e,id){e.preventDefault();
@@ -379,7 +392,7 @@ async function upload(){try{const f=await readFile($('evidence').files[0]);displ
 async function viewFile(id){try{const f=await call('getMyFile',id);const bytes=atob(f.data),array=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)array[i]=bytes.charCodeAt(i);const url=URL.createObjectURL(new Blob([array],{type:f.mime}));const a=document.createElement('a');a.href=url;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){}}
 function localMissing(){const data=((state.steps||[]).find(x=>Number(x.step)===1)||{}).data||{},m=[];
  (state.fields[1]||[]).forEach(([k])=>{if(k==='note')return;const el=$('f_'+k),v=el&&!el.disabled?el.value.trim():String(data[k]||'').trim();if(!v)m.push({key:k})});
- if(!state.testSkipFiles)((state.docBoard&&state.docBoard.rows)||[]).filter(r=>r.stage==='CONTRACT'&&r.vendorDoc&&r.required&&!r.uploads.length).forEach(r=>m.push({key:'doc'+r.code}));return m}
+ if(!state.testSkipFiles)renewRows((state.docBoard&&state.docBoard.rows)||[]).filter(r=>r.stage==='CONTRACT'&&r.vendorDoc&&r.required&&!r.uploads.length).forEach(r=>m.push({key:'doc'+r.code}));return m}
 async function submitAll(){const miss=localMissing();if(miss.length){markMissing(miss);msg(/^doc/.test(miss[0].key)?'제출 서류를 먼저 작성해 주세요':'빨간 칸을 채워 주세요');return}
  if(!confirm('제출할까요?\n제출하면 검토가 끝날 때까지 수정할 수 없습니다.'))return;if(dirty&&!await save(false))return;
  try{const r=await call('submitProfile');if(r.ok){display(await call('portalData'));msg('제출했습니다. 본사 담당자가 검토합니다.')}else{markMissing(r.missing||[]);msg('빈 항목이 있습니다.')}}catch(e){}}
