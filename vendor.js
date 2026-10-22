@@ -53,7 +53,7 @@ function todoRows(j,t){const S=j.stats||{},inRange=j.startDate<=t&&(!j.endDate||
  return '<div class="stage">오늘 할 일</div>'+list.map(([m,txt,tag])=>'<button class="vtodo" type="button" onclick="vgo(\''+m+'\',\''+id+'\')"><span>'+escapeText(txt)+'</span><span class="req">'+escapeText(tag)+' ›</span></button>').join('')}
 function renderDash(){const el=$('execArea');if(!el||!vjobs)return;
  // v5.18 공사 화면 미리 받기는 5분에 한 번만 (예전: 대시보드를 그릴 때마다 3번씩 → 다음 버튼과 겹쳐 느려짐)
- clearTimeout(window.__pf);if(!window.__pfAt||Date.now()-window.__pfAt>300000)window.__pf=setTimeout(()=>{window.__pfAt=Date.now();vjobs.jobs.filter(j=>j.status!=='ENDED').slice(0,3).forEach((j,i)=>setTimeout(()=>callQuiet('vendorJob',j.id).catch(()=>{}),i*600))},1500);vjob=null;clearInterval(wkTimer);const d=vjobs,t=d.today,act=d.jobs.filter(j=>j.status!=='ENDED'),ended=d.jobs.filter(j=>j.status==='ENDED');
+ /* v4: 대시보드가 상세자료 3건을 자동으로 요청하던 동작 제거. 상세는 공사 선택 시에만 요청. */clearTimeout(window.__pf);vjob=null;clearInterval(wkTimer);const d=vjobs,t=d.today,act=d.jobs.filter(j=>j.status!=='ENDED'),ended=d.jobs.filter(j=>j.status==='ENDED');
  const due=act.reduce((n,j)=>n+((j.stats&&j.stats.inspDue&&!j.stats.inspToday&&j.startDate<=t)?1:0)+((j.stats&&j.stats.openFindings)||0),0);setBadge($('vm_insp'),due);setBadge($('menuBtn'),due);
  // v5.17 계약 전 평가 유효기간 30일 이내·만료·재평가 중이면 대시보드 위에 안내
  const cb=state.company||{},cv=cb.valid,rn=cb.renewAt?{DRAFT:'작성 중',CORRECTION:'보완 요청',SUBMITTED:'본사 검토 중',SAFETY_REVIEW:'본사 검토 중'}[cb.submissionStatus]||'진행 중':'';
