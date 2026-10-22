@@ -36,7 +36,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.22 v5.12';
+const UI_VERSION='26.10.22 v5.13';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -400,7 +400,7 @@ const EXEC_OK=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/
 /* v5.10 서버는 처리를 끝냈는데 응답이 중간에 사라지는 경우(구글 응답 전달 오류: 404·CORS)가 있음
  *  → 다시 해도 결과가 같은 요청(조회·임시저장·로그인)은 자동으로 2번까지 다시 보냄
  *  → 제출·발행·승인처럼 두 번 하면 안 되는 요청은 다시 보내지 않고 안내만 */
-const RETRY_OK=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard','meetingDetail','permitList','permitDetail','getPermit','inspList','inspMine','jobEvalList','noticeList','vendorList','staffList','templateAdminList','reviewList','applications','getReviewData','getMeetingPhoto','getInspPhoto','myBadges','saveStep','getMyFile','getInternalFile','getTemplate','jobEvalFile','saveMeetingDocs','setMeetingOpen','confirmAttendee','checkInspections','readNotices','approvePermits']);
+const RETRY_OK=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard','meetingDetail','permitList','permitDetail','getPermit','inspList','inspMine','jobEvalList','noticeList','vendorList','staffList','templateAdminList','reviewList','applications','getReviewData','getMeetingPhoto','getInspPhoto','myBadges','saveStep','getMyFile','getInternalFile','getTemplate','jobEvalFile','saveMeetingDocs','setMeetingOpen','confirmAttendee','checkInspections','readNotices','approvePermits','jobEvalList']);
 async function post_(body){if(!EXEC_OK)throw Error('config.js에 Apps Script 주소(/exec)가 등록되지 않았습니다.');
  const again=body.op==='login'||RETRY_OK.has(body.fn);let o,last;
  for(let i=0;i<(again?3:1);i++){if(i)await new Promise(r=>setTimeout(r,800*i));
