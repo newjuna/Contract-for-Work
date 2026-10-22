@@ -67,7 +67,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.23 v5.26';
+const UI_VERSION='26.10.23 v5.27';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -264,11 +264,43 @@ const execOk_=s=>!!(s&&!s.staff&&s.company&&s.company.status==='VERIFIED'&&(s.co
 /* v5.26: 최초 로그인 체크리스트에서 배정 공사를 실제로 한 번만 조회한다.
  *  8초 이상 걸리면 화면 사용을 허용하되 같은 서버 요청을 다시 보내지 않는다. */
 let loginJobsPending=null;
+/* v5.27: 최초 로그인 중 작업자/허가서 화면을 열기 위한 읽기 전용 자료 선조회.
+   배정된 활성 공사 최대 2건, 작업허가서는 첫 활성 공사 1건만 조회.
+   제출·승인·서명·순회점검 저장을 선실행하지 않는다. */
+const LOGIN_PREP_MAX_JOBS=2;
+let loginPrepSeq=0;
+const loginPrepared=new Map();
+const loginPreparing=new Set();
+function prepareJobScreens(list,owner){
+ if(!list||!Array.isArray(list.jobs)||!list.jobs.length||loginPreparing.has(owner)||loginPrepared.has(owner))return Promise.resolve();
+ loginPreparing.add(owner);
+ const jobs=list.jobs.filter(j=>j&&j.id&&j.status!=='ENDED').slice(0,LOGIN_PREP_MAX_JOBS);
+ if(!jobs.length)return Promise.resolve();
+ const seq=++loginPrepSeq;
+ const preps=jobs.map((j,idx)=>{
+  const cached=cacheGet('vendorJob',[j.id]);
+  return (cached?Promise.resolve(cached):callQuiet('vendorJob',j.id)).then(v=>{
+   if(seq!==loginPrepSeq||!v||!state||state.email!==owner)return;
+   cacheSet('vendorJob',[j.id],v);
+   if(idx!==0||!v.today)return;
+   // 작업허가서 읽기는 화면 진입 시 필요한 경우에만. 첫 공사만 사전 준비.
+   return callQuiet('getPermit',j.id,v.today).then(r=>{
+    if(seq!==loginPrepSeq||!state||state.email!==owner)return;
+    cacheSet('getPermit',[j.id,v.today],r);
+    if(vjob&&vjob.job.id===j.id)vjob.permitToday=r;
+   }).catch(()=>{});
+  }).catch(()=>{});
+ });
+ const all=Promise.allSettled(preps).then(()=>{if(seq===loginPrepSeq)loginPrepared.set(owner,Date.now())}).finally(()=>loginPreparing.delete(owner));
+ return all;
+}
 function prepareLoginJobs(s,pi){
  if(pi<0||!s||s.staff||!execOk_(s))return Promise.resolve();
  bootSet(pi,'run');
  const load=callQuiet('myJobs').then(r=>{
   vjobs=r;vjobsAt=Date.now();cacheSet('myJobs',[],r);
+  // 체크리스트 단계에서 미리 공사 상세/작업자/허가서 읽기 시작 (저장 로직은 실행하지 않음).
+  prepareJobScreens(r,s.email);
   if(state&&state.email===s.email&&tab==='my'&&$('execArea')&&!vjob){setupVMenu();renderMyJobs()}
   bootSet(pi,'done');return r;
  }).catch(e=>{bootSet(pi,'fail');return null}).finally(()=>{if(loginJobsPending===load)loginJobsPending=null});
@@ -439,10 +471,10 @@ let vjobsAt=0;  // v5.18 공사 목록 받은 시각 (방금 받았으면 화면
 /* v5.20 가진 목록(메모리·이 기기 저장본)으로 먼저 바로 그림 → 뒤에서 새로 받아 바뀐 경우만 다시 그림 (예전: 대시보드를 누르면 서버 응답까지 이전 화면 그대로) */
 async function loadMyJobs(quick){const x=()=>$('execArea');if(!vjobs){const c=cacheGet('myJobs',[]);if(c)vjobs=c}
  const had=!!vjobs,old=had?JSON.stringify(vjobs):'';if(had){setupVMenu();renderMyJobs();if(quick&&Date.now()-vjobsAt<20000)return}
- try{const r=await (loginJobsPending||(had||/^MEET-/.test(LINK_REVIEW)?callQuiet:call)('myJobs'));/* 참석 QR 화면 위에 로딩 창을 띄우지 않음 */vjobsAt=Date.now();vjobs=r;if(!had){setupVMenu();renderMyJobs()}else if(JSON.stringify(r)!==old){setupVMenu();if(vmenu==='dash'&&!vjob)renderDash()}}catch(e){if(!had&&x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
+ try{const r=await (loginJobsPending||(had||/^MEET-/.test(LINK_REVIEW)?callQuiet:call)('myJobs'));/* 참석 QR 화면 위에 로딩 창을 띄우지 않음 */vjobsAt=Date.now();vjobs=r;if(!loginPrepared.has(state?.email||'')&&execOk_(state))prepareJobScreens(r,state.email);if(!had){setupVMenu();renderMyJobs()}else if(JSON.stringify(r)!==old){setupVMenu();if(vmenu==='dash'&&!vjob)renderDash()}}catch(e){if(!had&&x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
 function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
 async function openVJob(id){const c=cacheGet('vendorJob',[id]);vtab='today';showQr=false;showAdd=false;
- if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vSel!==id||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
+ if(c){vjob=c;const cp=cacheGet('getPermit',[id,c.today]);if(cp&&!vjob.permitToday)vjob.permitToday=cp;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vSel!==id||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
  try{const started=Date.now();vjob=await call('vendorJob',id);const received=Date.now();renderVJob();window.scrollTo(0,0);perfRecord('ui','vendorJobRender',Date.now()-received,true);perfRecord('flow','vendorJobTotal',Date.now()-started,true)}catch(e){const el=$('execArea');if(el)el.innerHTML='<div class="card"><h2>공사 화면을 열지 못했습니다</h2><p class="desc">'+escapeText(e.message||'통신 오류가 발생했습니다.')+'</p><button class="button" type="button" onclick="openVJob(vSel)">다시 시도</button></div>';}}
 function backJobs(){vgo('dash')}
 function setVTab(t){vtab=t;renderVJob()}
