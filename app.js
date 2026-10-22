@@ -118,7 +118,7 @@ function vendorHomeHtml(b){
 function renewRows(rows,b){b=b||(state&&state.company);return b&&b.renewAt?rows.map(r=>Object.assign({},r,{uploads:(r.uploads||[]).filter(u=>String(u.uploadedAt)>=String(b.renewAt))})):rows}
 /** v5.17 계약 전 평가 유효기간 안내 (업체 화면) */
 function validNote(b){const v=b&&b.valid;if(!v)return '';const warn=v.expired||v.days<=30;
- return '<div class="note'+(warn?' warnnote':'')+'" style="margin-top:10px'+(warn?';border-left:3px solid var(--accent)':'')+'"><b>계약 전 평가 유효기간</b> · '+escapeText(v.from)+' ~ '+escapeText(v.until)+' '+(v.expired?'<b class="req">만료</b><br>새 공사에 배정되려면 계약 전 서류를 고쳐서 다시 제출해 주세요. (진행 중인 공사는 계속 진행할 수 있습니다)':v.days<=30?'<b class="req">D-'+v.days+'</b><br>기간이 끝나면 새 공사에 배정될 수 없습니다. 미리 고쳐서 다시 제출해 주세요.':'(D-'+v.days+')')+'</div>'}
+ return '<div class="note'+(warn?' warnnote':'')+'" style="margin-top:10px'+(warn?';border-left:3px solid var(--accent)':'')+'"><b>계약 전 평가 유효기간</b> · '+escapeText(v.from)+' ~ '+escapeText(v.until)+' '+(v.expired?'<b class="req">만료</b><br>새 공사에 배정되려면 [신규 작성]으로 계약 전 서류를 다시 제출해 주세요. (진행 중인 공사는 계속 진행할 수 있습니다)':v.days<=30?'<b class="req">D-'+v.days+'</b><br>기간이 끝나면 새 공사에 배정될 수 없습니다. 미리 [신규 작성]으로 다시 제출해 주세요.':'(D-'+v.days+')')+'</div>'}
 /* 공통: 상단 업체 카드 + 진행 단계 */
 function headCard(b,st,todo,pctHtml){
  const flow=['정보·서류 작성','제출','본사 1차 검토','안전보건팀 확인','수행 단계'],cur={DRAFT:0,CORRECTION:0,SUBMITTED:2,SAFETY_REVIEW:3,APPROVED:4}[st]??0;
@@ -155,7 +155,7 @@ function contractHomeHtml(b){
  const total=need.length+req.length,pct=total?Math.round((infoDone+docDone)/total*100):0;
  const todo=st==='SUBMITTED'?'제출이 완료되었습니다. 본사 담당자가 서류를 검토하고 있습니다.':st==='SAFETY_REVIEW'?'1차 검토가 끝나 안전보건팀이 확인하고 있습니다. 승인되면 안내 창이 뜹니다.'
   :correcting?'본사에서 보완을 요청했습니다. 표시된 항목만 수정한 뒤 다시 제출해 주세요.'+(state.correctionNote?' · 보완 사유: '+state.correctionNote:'')
-  :b.renewAt?(pct<100?'재평가: 이전에 쓴 내용이 채워져 있습니다. ① 사업장 정보를 확인·수정하고 ② 규정·계획서를 [작성하기]로 다시 작성(서명)해 주세요.':'모든 항목이 준비되었습니다. 맨 아래 [제출하기]를 눌러 주세요. 승인되면 유효기간이 1년 연장됩니다.')
+  :b.renewAt?(pct<100?(b.renewMode==='NEW'?'신규 작성: ⓪ 사업자 정보 ① 사업장 정보를 입력하고 ② 규정·계획서를 [작성하기]로 작성(서명)해 주세요.':'이전 정보를 불러왔습니다. ⓪ 사업자 정보 ① 사업장 정보에서 바뀐 곳만 고치고 ② 규정·계획서를 [작성하기]로 다시 작성(서명)해 주세요.'):'모든 항목이 준비되었습니다. 맨 아래 [제출하기]를 눌러 주세요. 승인되면 유효기간이 1년 연장됩니다.')
   :pct<100?'① 사업장 정보를 입력하고 ② 규정·계획서를 [작성하기]로 작성해 주세요.':'모든 항목이 준비되었습니다. 맨 아래 [제출하기]를 눌러 주세요.';
  const pctHtml='<div class="row" style="justify-content:space-between;margin-top:12px"><span class="muted">준비 상태 · 사업장 정보 '+infoDone+'/'+need.length+' · 서류 '+docDone+'/'+req.length+'</span><b style="color:#1b7442">'+pct+'%</b></div><div class="prog"><span style="width:'+pct+'%"></span></div>';
  const info='<div class="card"><h2>① 사업장 정보</h2><p class="muted">입력하면 자동 저장됩니다.</p><form id="stepForm" oninput="changed()" onsubmit="saveManual(event)">'+infoForm(b,dis)+'<div class="row" style="justify-content:space-between;margin-top:10px"><span class="statusline" id="saved">서버 저장 상태: -</span><button class="button ghost" type="submit" '+(locked?'disabled':'')+'>임시저장</button></div></form></div>';
@@ -163,8 +163,20 @@ function contractHomeHtml(b){
  const docs='<div class="card"><h2>② 계약 전 제출 서류</h2>'+(rows.map(r=>r.code==='C01'&&state.forms?ruleCardHtml(r,{lockMsg}):r.code==='C02'&&state.forms&&state.forms.plan?planCardHtml(r,{lockMsg}):docCard(r,{exec:false,lockMsg})).join('')||'<p class="desc">제출할 서류가 아직 설정되지 않았습니다.</p>')
   +'</div>';
  const fin='<div class="card"><h2>③ 제출</h2>'+(locked?'<div class="note">'+escapeText(SUB_LABEL[st]||st)+' 상태입니다. 제출한 내용은 검토가 끝날 때까지 수정할 수 없습니다.</div>':'<p class="desc">제출하면 본사 담당자 → 안전보건팀 순서로 검토합니다.</p><button class="button" style="width:100%" type="button" onclick="submitAll()">누락 확인 후 제출하기</button>')+'</div>';
- return headCard(b,st,todo,pctHtml)+info+docs+fin;
+ return headCard(b,st,todo,pctHtml)+(b.renewAt?bizInfoCard(b,locked||(correcting&&!allowed.some(k=>/^1:/.test(k)))):'')+info+docs+fin;
 }
+/** v5.17 신규 작성: 업체 기본 정보(사업자 정보) 확인·수정 카드. 업체명·사업자번호는 계정 기준이라 고정 */
+function bizInfoCard(b,dis){const fresh=b.infoFresh,blank=b.renewMode==='NEW'&&!fresh,v=k=>blank?'':escapeText(b[k]||''),ph=k=>blank&&b[k]?' placeholder="이전: '+escapeText(b[k])+'"':'';
+ const F=[['bRep','representative','대표자'],['bAddr','address','사업장 주소'],['bContact','contact','업체 담당자'],['bPhone','phone','담당자 연락처']];
+ return '<div class="card" id="bizCard"><h2>⓪ 사업자 정보 '+(fresh&&b.infoAt&&String(b.infoAt)>=String(b.renewAt)?'<span class="pill ok">✔ 확인 완료</span>':b.renewMode==='NEW'?'<span class="pill todo">입력 필요</span>':'<span class="pill lock">이전 정보</span>')+'</h2>'
+  +'<p class="muted">업체명 <b>'+escapeText(b.company)+'</b> · 사업자번호 <b>'+escapeText(b.regNo)+'</b> (변경 불가 · 사업자가 바뀌면 새로 가입해 주세요)</p>'
+  +'<div class="formgrid">'+F.map(([id,k,l])=>'<div class="lb"><label for="f_'+id+'">'+l+'<span class="req">*</span></label></div><div class="vl"><input id="f_'+id+'" type="'+(k==='phone'?'tel':'text')+'" value="'+v(k)+'"'+ph(k)+(dis?' disabled':'')+'></div>').join('')
+  +'<div class="lb"><label for="f_bCert">사업자등록증</label></div><div class="vl"><input id="f_bCert" type="file" accept=".pdf,.jpg,.jpeg,.png"'+(dis?' disabled':'')+'><div class="muted">바뀐 경우에만 새로 올려 주세요 (선택)</div></div></div>'
+  +(dis?'':'<button class="button ghost" type="button" style="margin-top:10px" onclick="saveBizInfo()">사업자 정보 저장</button>')+'</div>'}
+async function saveBizInfo(){const d={representative:value('bRep'),address:value('bAddr'),contact:value('bContact'),phone:value('bPhone')};
+ const miss=[['bRep','representative'],['bAddr','address'],['bContact','contact'],['bPhone','phone']].filter(([,k])=>!d[k]).map(([key])=>({key}));if(miss.length){markMissing(miss);return}
+ let cert=null;const fl=$('f_bCert')&&$('f_bCert').files[0];if(fl){try{cert=await readFile(fl)}catch(e){alert(e.message);return}}
+ if(dirty&&!await save(false))return;try{display(await call('saveCompanyInfo',d,cert));msg('사업자 정보를 저장했습니다.')}catch(e){}}
 /* ---------- 수행 단계 화면 (승인 후, 모바일 우선) ---------- */
 function executionHomeHtml(b){
  const rows=(state.docBoard&&state.docBoard.rows)||[];
@@ -391,6 +403,7 @@ async function goStep(n){if(dirty){if(!await save(false))return}activeStep=n;ren
 async function upload(){try{const f=await readFile($('evidence').files[0]);display(await call('uploadEvidence',f));msg('파일 첨부 완료')}catch(e){alert(e.message)}}
 async function viewFile(id){try{const f=await call('getMyFile',id);const bytes=atob(f.data),array=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)array[i]=bytes.charCodeAt(i);const url=URL.createObjectURL(new Blob([array],{type:f.mime}));const a=document.createElement('a');a.href=url;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){}}
 function localMissing(){const data=((state.steps||[]).find(x=>Number(x.step)===1)||{}).data||{},m=[];
+ if(state.company&&state.company.renewAt&&!state.company.infoFresh)m.push({key:'bRep'});  // v5.17 처음부터 새로 작성: 사업자 정보 저장 필요
  (state.fields[1]||[]).forEach(([k])=>{if(k==='note')return;const el=$('f_'+k),v=el&&!el.disabled?el.value.trim():String(data[k]||'').trim();if(!v)m.push({key:k})});
  if(!state.testSkipFiles)renewRows((state.docBoard&&state.docBoard.rows)||[]).filter(r=>r.stage==='CONTRACT'&&r.vendorDoc&&r.required&&!r.uploads.length).forEach(r=>m.push({key:'doc'+r.code}));return m}
 async function submitAll(){const miss=localMissing();if(miss.length){markMissing(miss);msg(/^doc/.test(miss[0].key)?'제출 서류를 먼저 작성해 주세요':'빨간 칸을 채워 주세요');return}
