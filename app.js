@@ -52,7 +52,14 @@ function perfOpen(){toggleMenu(false);let e=$('perfPanel');if(!e){e=document.cre
  $('perfCopy').onclick=()=>{const txt='도급관리 '+UI_VERSION+'\n'+rows.map(x=>x.at+' | '+x.name+' | '+(x.ms/1000).toFixed(1)+'초 | '+(x.ok?'완료':'실패')).join('\n');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(txt).then(()=>msg('진단 결과를 복사했습니다.')).catch(()=>msg('복사가 차단되었습니다. 표를 캡처해 주세요.'));else msg('표를 캡처해 주세요.')};
 }
 
-function call(name,...args){loadStart(name);return api(name,args).then(r=>{loadEnd();cacheSet(name,args,r);return r},e=>{loadEnd();msg(e.message||'처리에 실패했습니다.');throw e})}
+/* v5.25: 단순 조회는 전체화면 차단 팝업 대신 화면 상단 진행선만 표시.
+   저장·등록·제출 등 변경 작업만 기존 차단 로딩을 유지한다. */
+function call(name,...args){
+ const read=READS.has(name);
+ if(read)barStart();else loadStart(name);
+ const finish=()=>{if(read)barEnd();else loadEnd()};
+ return api(name,args).then(r=>{finish();cacheSet(name,args,r);return r},e=>{finish();msg(e.message||'처리에 실패했습니다.');throw e});
+}
 /** 화면을 가리지 않는 조용한 호출 (자동저장용) */
 function callQuiet(name,...args){return api(name,args).then(r=>{cacheSet(name,args,r);return r})}
 function input(id,label,value='',type='text',disabled=false,ph=''){return `<div class="field"><label for="f_${id}">${escapeText(label)}</label><input id="f_${id}" type="${type}" value="${escapeText(value)}" ${ph?`placeholder="${escapeText(ph)}"`:''} ${disabled?'disabled':''}></div>`}
@@ -60,7 +67,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.23 v5.24';
+const UI_VERSION='26.10.23 v5.25';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -249,7 +256,7 @@ function bootTick(){if(!BOOT)return;const i=BOOT.st.indexOf('run'),n=$('bootNote
  const e=Math.floor((Date.now()-BOOT.s0[i])/1000),tx=$('bts_'+i);if(tx)tx.textContent=e?e+'초':'';
  if(n)n.textContent=e<5?'':e<15?'구글 서버에서 자료를 모으고 있습니다 · 정상 진행 중입니다':e<30?'처음 접속이거나 사용자가 많으면 20초 정도 걸릴 수 있습니다 · 오류가 아닙니다':'평소보다 오래 걸리고 있습니다 ('+e+'초). 그대로 기다리거나 아래 버튼을 눌러 주세요.';
  if(b&&b.hidden&&BOOT.fn&&e>=(BOOT.fnLabel==='건너뛰고 시작'?8:25)){b.textContent=BOOT.fnLabel;b.onclick=()=>{const f=BOOT&&BOOT.fn;if(f)f()};b.hidden=false}}
-function bootEnd(){const el=$('bootBox');if(el)el.hidden=true;if(BOOT)clearInterval(BOOT.tm);BOOT=null}
+function bootEnd(){const el=$('bootBox');if(el)el.hidden=true;if(BOOT)clearInterval(BOOT.tm);BOOT=null;/* 로그인 준비 종료 후 조회 로딩이 남아 화면을 가리지 않게 함 */if(!loadCount){clearTimeout(coverTimer);$('cover').style.display='none'}}
 const execOk_=s=>!!(s&&!s.staff&&s.company&&s.company.status==='VERIFIED'&&(s.company.submissionStatus==='APPROVED'||s.company.renewAt));
 /** 내 정보를 받은 뒤: (pi 단계) 공사·업무 화면 미리 받기 → 화면 열기. pi<0이면 미리 받기 없이 바로 */
 /* v4: 내 정보 확인 뒤 화면부터 공개한다. 공사 목록은 독립 조회하므로 초기 화면을 막지 않는다.
