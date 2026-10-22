@@ -44,7 +44,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.23 v5.20';
+const UI_VERSION='26.10.23 v5.20 + v3 성능개선';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -211,18 +211,18 @@ const busyView=()=>dirty||!!document.querySelector('#csheet[style*="block"],#psh
 const noBadge=o=>JSON.stringify(Object.assign({},o,{badges:null}));
 async function bootPortal(noPack){const c=cacheGet('portalData',[]);
  /* v5.20 저장해 둔 화면이 없으면: 체크리스트로 준비 과정을 보여 주며 내 정보 → 공사·업무 화면을 한 번에 미리 받고 시작 */
- if(!c){let s;bootUI(['저장된 로그인 확인','내 정보 불러오기'].concat(noPack?[]:['공사·업무 화면 미리 준비']).concat(['화면 열기']));bootSet(0,'done');bootSet(1,'run');bootSkip(()=>location.reload(),'새로 고침');
+ if(!c){let s;bootUI(['저장된 로그인 확인','내 정보 불러오기'].concat(noPack?[]:['공사 목록 준비']).concat(['화면 열기']));bootSet(0,'done');bootSet(1,'run');bootSkip(()=>location.reload(),'새로 고침');
   try{s=await api('portalData',[])}catch(e){bootEnd();msg(e.message||'불러오지 못했습니다.');throw e}bootSet(1,'done');await bootRest(s,noPack?-1:2);return}
- display(c);if(!noPack&&c.company&&!c.staff){window.__pfAt=Date.now();callQuiet('bootPack').then(applyPack).catch(()=>{})}/* 업체: 공사 화면들을 뒤에서 한 번에 새로 받음 */
+ display(c);/* v4: 캐시 화면이 있다면 즉시 표시. 공사 목록은 해당 화면에서 독립적으로 갱신하므로 여기서 bootPack 중복 호출하지 않음. *//* 업체: 공사 화면들을 뒤에서 한 번에 새로 받음 */
  callQuiet('portalData').then(s=>{if(!c.email||s.email!==c.email){setCUser(s.email+'|'+(s.mode||''));display(s);return}
   if(noBadge(s)===noBadge(c)){state.badges=s.badges;showBadges(s.badges);return}if(busyView()){state=s;showBadges(s.badges)}else display(s)}).catch(e=>{popup('서버와 연결되지 않았습니다','지금 화면은 이 기기에 저장해 둔 이전 화면입니다.\n저장·제출이 되지 않을 수 있습니다.\n\n'+(e&&e.message||''),'확인')})}
 /* ---------- v5.20 시작 준비 체크리스트 ----------
  *  로그인(또는 저장된 화면이 없을 때) → 단계마다 ✔ 표시 · 걸린 시간 표시
- *  '공사·업무 화면 미리 준비'에서 공사 목록·공사 화면·오늘 허가서까지 한 번에 받아 둠 → 이후 메뉴는 바로 열림
+ *  '공사 목록 준비'에서 공사 목록·공사 화면·오늘 허가서까지 한 번에 받아 둠 → 이후 메뉴는 바로 열림
  *  오래 걸리면 안내 문구 + [건너뛰고 시작]/[처음부터 다시] 버튼 (사람들이 새로 고침을 반복하지 않게) */
 let BOOT=null;
 function bootUI(labels){let el=$('bootBox');if(!el){el=document.createElement('div');el.id='bootBox';document.body.appendChild(el)}
- el.innerHTML='<div class="bootcard" role="status" aria-live="polite"><div class="lbrand"><i aria-hidden="true"></i>도급 안전관리</div><h2>시작 준비 중</h2><p class="muted bootsub">필요한 화면을 먼저 받아 두고 시작합니다. 받아 두면 메뉴가 바로 열립니다.</p><ol class="bootlist">'
+ el.innerHTML='<div class="bootcard" role="status" aria-live="polite"><div class="lbrand"><i aria-hidden="true"></i>도급 안전관리</div><h2>시작 준비 중</h2><p class="muted bootsub">로그인과 공사 목록을 확인합니다. 상세 자료는 해당 업무를 열 때 불러옵니다.</p><ol class="bootlist">'
   +labels.map((l,i)=>'<li id="bt_'+i+'" class="wait"><i aria-hidden="true"></i><span>'+escapeText(l)+'</span><em id="bts_'+i+'"></em></li>').join('')+'</ol><p class="bootnote" id="bootNote"></p><button class="button ghost" type="button" id="bootBtn" hidden></button><div class="lver">'+escapeText(UI_VERSION)+'</div></div>';
  el.hidden=false;if(BOOT)clearInterval(BOOT.tm);BOOT={labels,st:labels.map(()=>'wait'),s0:[],fn:null,fnLabel:'',tm:setInterval(bootTick,500)};bootTick()}
 function bootSet(i,s){if(!BOOT||BOOT.labels[i]==null)return;const li=$('bt_'+i),tx=$('bts_'+i),now=Date.now();
@@ -236,10 +236,15 @@ function bootTick(){if(!BOOT)return;const i=BOOT.st.indexOf('run'),n=$('bootNote
 function bootEnd(){const el=$('bootBox');if(el)el.hidden=true;if(BOOT)clearInterval(BOOT.tm);BOOT=null}
 const execOk_=s=>!!(s&&!s.staff&&s.company&&s.company.status==='VERIFIED'&&(s.company.submissionStatus==='APPROVED'||s.company.renewAt));
 /** 내 정보를 받은 뒤: (pi 단계) 공사·업무 화면 미리 받기 → 화면 열기. pi<0이면 미리 받기 없이 바로 */
-async function bootRest(s,pi){setCUser(s.email+'|'+(s.mode||''));cacheSet('portalData',[],s);state=s;
- if(pi>=0){if(s.staff||execOk_(s)){bootSet(pi,'run');window.__pfAt=Date.now();let skip;const sk=new Promise(r=>skip=r);bootSkip(()=>skip(),'건너뛰고 시작');
-   const pk=callQuiet('bootPack').then(p=>{applyPack(p);bootSet(pi,'done')},()=>bootSet(pi,'fail'));await Promise.race([pk,sk]);if(BOOT&&BOOT.st[pi]==='run')bootSet(pi,'skip')}else bootSet(pi,'done')}
- const li=BOOT?BOOT.labels.length-1:0;bootSet(li,'run');display(s);bootSet(li,'done');setTimeout(bootEnd,350)}
+/* v4: 내 정보 확인 뒤 화면부터 공개한다. 공사 목록은 독립 조회하므로 초기 화면을 막지 않는다.
+ * 메뉴 진입 시 loadJobs / loadMyJobs 가 각각 서버 조회를 수행한다. */
+async function bootRest(s,pi){
+ setCUser(s.email+'|'+(s.mode||''));cacheSet('portalData',[],s);state=s;
+ if(pi>=0)bootSet(pi,'skip');
+ const li=BOOT?BOOT.labels.length-1:0;
+ bootSet(li,'run');display(s);bootSet(li,'done');
+ setTimeout(bootEnd,180);
+}
 /** 미리 받은 자료를 이 기기 저장본·메모리에 넣음 (늦게 도착해도 지금 보고 있는 목록 화면이면 다시 그림) */
 function applyPack(p){if(!p)return;const now=Date.now();
  if(p.jobBoard){jobData=p.jobBoard;jobAt=now;seenTab.jobs=1;cacheSet('jobBoard',[],p.jobBoard);if(state&&state.staff&&tab==='jobs'&&jobsMode==='list')renderJobs()}
@@ -512,7 +517,7 @@ function renderGoogleBtn(){if(gsiDone)return;if(!window.google?.accounts?.id){gs
   setTimeout(renderGoogleBtn,300);return}gsiDone=true;$('gsiSlow')?.remove();google.accounts.id.initialize({client_id:CONF.CLIENT_ID,callback:onGoogleLogin,ux_mode:'popup'});google.accounts.id.renderButton($('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'})}
 /* v5.20 로그인 = 왕복 1번에 내 정보(또는 QR 등록·참석 화면)까지 받음 → 이어서 공사·업무 화면 미리 받기 (체크리스트로 진행 표시) */
 async function onGoogleLogin(r){if(!r||!r.credential)return;const st=$('loginStatus'),wk=isWorkerLink(),mt=/^MEET-[a-f0-9]{32}$/.test(LINK_REVIEW);st.textContent='';
- bootUI(wk?['구글 계정 확인','서버 로그인 · 등록 화면 준비']:mt?['구글 계정 확인','서버 로그인 · 참석 화면 준비','화면 열기']:['구글 계정 확인','서버 로그인 · 내 정보 불러오기','공사·업무 화면 미리 준비','화면 열기']);
+ bootUI(wk?['구글 계정 확인','서버 로그인 · 등록 화면 준비']:mt?['구글 계정 확인','서버 로그인 · 참석 화면 준비','화면 열기']:['구글 계정 확인','서버 로그인 · 내 정보 불러오기','공사 목록 준비','화면 열기']);
  bootSet(0,'done');bootSet(1,'run');bootSkip(()=>location.reload(),'처음부터 다시');
  let d;try{d=await post_({op:'login',credential:r.credential,mode:wk?'':loginMode(),boot:wk||mt?LINK_REVIEW:'1'})}catch(e){bootEnd();st.textContent='로그인 실패: '+e.message;return}
  SESSION=d.key;sessSave(SESSION);try{const p=r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const j=JSON.parse(decodeURIComponent(escape(atob(p+'==='.slice((p.length+3)%4)))));setCUser(String(j.email||'').toLowerCase()+'|'+(wk?'':loginMode()))}catch(e){setCUser('')}
