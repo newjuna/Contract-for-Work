@@ -12,15 +12,29 @@ let loadTimer=null,loadPct=0,loadCount=0,coverTimer=null;
 function loadStart(name){loadCount++;if(loadCount>1)return;loadPct=0;$('loadMsg').textContent=(LOAD_MSG[name]||'처리하는 중')+'입니다';$('loadHint').textContent='잠시만 기다려 주세요';loadShow();/* v4.2 0.4초 안에 끝나면 로딩 화면 안 띄움 */clearTimeout(coverTimer);coverTimer=setTimeout(()=>{if(loadCount)$('cover').style.display='flex'},400);const t0=Date.now();clearInterval(loadTimer);loadTimer=setInterval(()=>{loadPct+=(92-loadPct)*0.05;const s=(Date.now()-t0)/1000;$('loadHint').textContent=s<3?'잠시만 기다려 주세요':s<7?'입력한 내용을 확인하고 저장하는 중입니다 · 정상 진행 중':s<15?'구글 시트에 기록하고 있습니다 · 보통 5~15초 걸립니다':'서버 응답을 기다리고 있습니다 ('+Math.round(s)+'초) · 오류가 아니니 창을 닫지 마세요';loadShow()},150)}
 function loadShow(){const p=Math.min(100,Math.round(loadPct));$('loadBar').style.width=p+'%';$('loadPct').textContent=p}
 function loadEnd(){loadCount=Math.max(0,loadCount-1);if(loadCount)return;clearInterval(loadTimer);clearTimeout(coverTimer);loadPct=100;loadShow();setTimeout(()=>{if(!loadCount)$('cover').style.display='none'},250)}
-function call(name,...args){loadStart(name);return api(name,args).then(r=>{loadEnd();return r},e=>{loadEnd();msg(e.message||'처리에 실패했습니다.');throw e})}
+/* v5.8 빠른 화면: 조회는 화면을 가리지 않고 위쪽 얇은 선만 표시 · 저장·제출·파일 만들기만 로딩 창 */
+const READS=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard','meetingDetail','permitList','permitDetail','getPermit','inspList','inspMine','jobEvalList','noticeList','vendorList','staffList','templateAdminList','reviewList','applications','getReviewData','getMeetingPhoto','getInspPhoto','myBadges']);
+let barN=0,barT=null;
+function barStart(){barN++;$('topLoad')?.classList.add('on');clearTimeout(barT);barT=setTimeout(()=>{if(barN)$('topNote')?.classList.add('on')},700)}
+function barEnd(){barN=Math.max(0,barN-1);if(!barN){clearTimeout(barT);$('topLoad')?.classList.remove('on');$('topNote')?.classList.remove('on')}}
+/* 한 번 본 화면은 이 기기에 저장해 두고 다음에 바로 보여 줌 (뒤에서 최신으로 바꿈). 로그아웃하면 지움 */
+const CACHE_FN=new Set(['portalData','myJobs','jobBoard','vendorJob','noticeList','vendorList']);
+let CUSER='';try{CUSER=localStorage.getItem('fcUser')||''}catch(e){}
+const ck_=(n,a)=>'fc:'+CUSER+':'+n+':'+JSON.stringify(a||[]);
+function cacheGet(n,a){if(!CUSER||!CACHE_FN.has(n))return null;try{const v=localStorage.getItem(ck_(n,a));return v?JSON.parse(v):null}catch(e){return null}}
+function cacheSet(n,a,v){if(!CUSER||!CACHE_FN.has(n))return;try{localStorage.setItem(ck_(n,a),JSON.stringify(v))}catch(e){cacheClear()}}
+function cacheClear(){try{const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('fc:'))ks.push(k)}ks.forEach(k=>localStorage.removeItem(k))}catch(e){}}
+function setCUser(u){u=String(u||'');if(u===CUSER)return;cacheClear();CUSER=u;try{localStorage.setItem('fcUser',u)}catch(e){}}
+function call(name,...args){if(READS.has(name)){barStart();return api(name,args).then(r=>{barEnd();cacheSet(name,args,r);return r},e=>{barEnd();msg(e.message||'불러오지 못했습니다.');throw e})}
+ loadStart(name);return api(name,args).then(r=>{loadEnd();return r},e=>{loadEnd();msg(e.message||'처리에 실패했습니다.');throw e})}
 /** 화면을 가리지 않는 조용한 호출 (자동저장용) */
-function callQuiet(name,...args){return api(name,args)}
+function callQuiet(name,...args){return api(name,args).then(r=>{cacheSet(name,args,r);return r})}
 function input(id,label,value='',type='text',disabled=false,ph=''){return `<div class="field"><label for="f_${id}">${escapeText(label)}</label><input id="f_${id}" type="${type}" value="${escapeText(value)}" ${ph?`placeholder="${escapeText(ph)}"`:''} ${disabled?'disabled':''}></div>`}
 function text(id,label,value='',disabled=false){return `<div class="field"><label for="f_${id}">${escapeText(label)}</label><textarea id="f_${id}" ${disabled?'disabled':''}>${escapeText(value)}</textarea></div>`}
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.21 v5.7';
+const UI_VERSION='26.10.21 v5.8';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -153,12 +167,18 @@ function markMissing(list){document.querySelectorAll('.miss').forEach(x=>x.class
 /** 누락 항목으로 이동 */
 function jumpTo(key){$('missing')?.remove();if(/^doc/.test(key)){const r=$('row_'+key);if(r){r.scrollIntoView({block:'center'});r.style.outline='3px solid #ed3155';setTimeout(()=>r.style.outline='',2500)}return}const f=$('f_'+key);if(f){f.scrollIntoView({block:'center'});f.focus()}}
 async function reload(){try{display(await call('portalData'))}catch(e){}}
+const busyView=()=>dirty||!!document.querySelector('#csheet[style*="block"],#psheet:not([hidden])')||(typeof jobsMode!=='undefined'&&tab==='jobs'&&!['list'].includes(jobsMode))||(typeof vjob!=='undefined'&&!!vjob);
+const noBadge=o=>JSON.stringify(Object.assign({},o,{badges:null}));
+async function bootPortal(){const c=cacheGet('portalData',[]);
+ if(!c){let s;loadStart('portalData');try{s=await api('portalData',[])}catch(e){msg(e.message||'불러오지 못했습니다.');throw e}finally{loadEnd()}setCUser(s.email+'|'+(s.mode||''));cacheSet('portalData',[],s);display(s);return}
+ display(c);callQuiet('portalData').then(s=>{if(!c.email||s.email!==c.email){setCUser(s.email+'|'+(s.mode||''));display(s);return}
+  if(noBadge(s)===noBadge(c)){state.badges=s.badges;showBadges(s.badges);return}if(busyView()){state=s;showBadges(s.badges)}else display(s)}).catch(()=>{})}
 /* ---------- v2.9 공사·현장미팅 (직원) ---------- */
 let jobData=null,roomTimer=null,roomId='';
 /* v4.2 빠른 화면 전환: 한 번 본 화면은 저장해 둔 내용을 바로 보여 주고, 최신 내용은 뒤에서 조용히 받아 바꿈 */
 const seenTab={};function fetcher(t){const f=seenTab[t]?callQuiet:call;seenTab[t]=1;return f}
 let jobsMode='list';
-async function loadJobs(){roomId='';jobsMode='list';const old=jobData?JSON.stringify(jobData):'';if(jobData)renderJobs();try{const x=await fetcher('jobs')('jobBoard');jobData=x;if(tab==='jobs'&&jobsMode==='list'&&JSON.stringify(x)!==old)renderJobs()}catch(e){}}
+async function loadJobs(){roomId='';jobsMode='list';if(!jobData){const c=cacheGet('jobBoard',[]);if(c)jobData=c}const old=jobData?JSON.stringify(jobData):'';if(jobData)renderJobs();try{const x=await fetcher('jobs')('jobBoard');jobData=x;if(tab==='jobs'&&jobsMode==='list'&&JSON.stringify(x)!==old)renderJobs()}catch(e){}}
 async function delJob(id){const j=jobData.jobs.find(x=>x.id===id);if(!j)return;const rec=(j.workerCount||j.crewDays)?'\n\n※ 이 공사에는 작업자 '+(j.workerCount||0)+'명, 작업인원 기록 '+(j.crewDays||0)+'일치가 있습니다. 함께 삭제됩니다.':'';
  if(!confirm('"'+j.title+'" 공사를 삭제할까요?\n참여 업체 배정 '+j.vendors.length+'곳, 미팅 '+j.meetings.length+'개도 함께 삭제되며 되돌릴 수 없습니다.'+rec))return;
  if(rec&&prompt('기록까지 삭제됩니다. 확인을 위해 공사명을 그대로 입력해 주세요.\n'+j.title)!==j.title){msg('공사명이 달라 삭제하지 않았습니다.');return}
@@ -274,9 +294,12 @@ async function sendCheckIn(e){e.preventDefault();const info={name:value('cName')
 /* ---------- v3.1 수행단계 (업체): 내 공사 → [오늘 할 일] / [비상대응훈련] ---------- */
 let vjobs=null,vjob=null,vtab='today',wkTimer=null,showQr=false,showAdd=false,workerLinkMode=false;
 const SIGN_LABEL={SELF:'✔ 본인 계정 서명',MANAGER:'✔ 소장 확인'};
-async function loadMyJobs(){const x=()=>$('execArea');try{vjobs=await callQuiet('myJobs');renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
+async function loadMyJobs(){const x=()=>$('execArea');const c=!vjobs&&cacheGet('myJobs',[]);if(c){vjobs=c;renderMyJobs()}try{vjobs=await callQuiet('myJobs');renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
 function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
-async function openVJob(id){try{vjob=await call('vendorJob',id);vtab='today';showQr=false;showAdd=false;renderVJob();window.scrollTo(0,0)}catch(e){}}
+async function openVJob(id){const c=cacheGet('vendorJob',[id]);vtab='today';showQr=false;showAdd=false;
+ if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
+ if($('execArea'))$('execArea').innerHTML='<div class="card"><p class="desc">공사 화면을 여는 중입니다…</p></div>';
+ try{vjob=await call('vendorJob',id);renderVJob();window.scrollTo(0,0)}catch(e){}}
 function backJobs(){vgo('dash')}
 function setVTab(t){vtab=t;renderVJob()}
 function renderVJob(){const el=$('execArea');if(!el||!vjob)return;const v=vjob;clearInterval(wkTimer);
@@ -351,7 +374,7 @@ async function downloadAdminFile(id,doc){try{const f=await call('getInternalFile
 async function loadReview(){try{const a=await fetcher('review')('reviewList');$('review').innerHTML=`<div class="card"><h2>안전보건정보 제출·검토</h2>${a.map(b=>`<div class="item"><b>${escapeText(b.company)}</b> · <span class="badge">${escapeText(b.submissionStatus)}</span><div class="desc">${escapeText(b.industry)}</div><button class="button ghost" onclick="openReview('${escapeText(b.id)}')">제출 정보 확인</button></div>`).join('')}</div><div id="reviewDetail"></div>`}catch(e){}}
 async function openReview(id){try{reviewing=await call('getReviewData',id);const b=reviewing.company;$('reviewDetail').innerHTML=`<div class="card"><h2>${escapeText(b.company)} · 제출 내용</h2>${reviewing.steps.map(s=>`<div class="item"><b>${escapeText(state.stepNames[Number(s.step)-1])}</b>${Object.entries(s.data).map(([k,v])=>`<p class="desc">${escapeText(k)}: ${escapeText(v)}</p>`).join('')}</div>`).join('')}<div class="line"></div><div class="desc">증빙: ${reviewing.documents.map(f=>`<a onclick="downloadAdminFile('${escapeText(b.id)}','${escapeText(f.id)}')">${escapeText(f.name)}</a>`).join(' / ')}</div><div class="line"></div><b>계약 단계 제출서류</b>${(reviewing.docSubmissions||[]).map(t=>`<div class="item"><b>${escapeText(t.name)}</b>${t.required?'<span class="badge" style="margin-left:6px">필수</span>':''}${t.uploads.length?`<span class="pill ok">v${escapeText(t.uploads[0].version)}</span>`:'<span class="pill todo">미등록</span>'} <span class="muted">보완키 4:doc${escapeText(t.code)}</span><div class="desc">${t.uploads.map(u=>`<a onclick="downloadAdminFile('${escapeText(b.id)}','${escapeText(u.id)}')">v${escapeText(u.version)} ${escapeText(u.name)}</a> <span class="muted">${escapeText(fmtTime(u.uploadedAt))}</span>`).join('<br>')||'등록된 파일 없음'}</div></div>`).join('')||'<p class="desc">설정된 제출서류가 없습니다.</p>'}<p>보완 요청(단계:항목명 형식, 예: 2:safetyManager, 서류는 4:docC01, 쉼표로 구분)</p><input id="corKeys" placeholder="2:safetyManager,3:riskFactors" style="padding:12px;width:100%"><textarea id="corReason" style="margin:9px 0;width:100%;min-height:70px;padding:10px" placeholder="보완 요청 사유"></textarea><div class="row"><button class="button ghost" onclick="reviewIt('${escapeText(b.id)}','CORRECT')">보완 요청</button><button class="button dark" onclick="reviewIt('${escapeText(b.id)}','CONTRACT_OK')">계약담당 1차 확인 완료</button><button class="button" onclick="reviewIt('${escapeText(b.id)}','SAFETY_OK')">안전보건팀 최종 승인</button></div><p class="desc">실제 법정 적격성 배점과 PDF 출력은 후속 모듈로 별도 개발됩니다. 이 버튼은 절차 상태 확인용입니다.</p></div>`}catch(e){}}
 async function reviewIt(id,decision){if(!confirm('검토 결과를 반영할까요?'))return;try{const reason=$('corReason')?.value||'',keys=($('corKeys')?.value||'').split(',').map(s=>s.trim()).filter(Boolean);await call('reviewAction',id,decision,reason,keys);msg('검토 결과 저장');loadReview()}catch(e){}}
-window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});async function bootApp(){try{if(/^WRK-[a-f0-9]{32}$/.test(LINK_REVIEW)){workerLinkMode=true;state=await call('portalData');showVer(state);$('identity').textContent='접속 계정: '+state.email;wkCheckIn();return}display(await call('portalData'));if(/^MEET-[a-f0-9]{32}$/.test(LINK_REVIEW)){meetCheckIn();return}if(LINK_REVIEW&&(['ADMIN','SAFETY'].includes(state.role)||state.isApprover))switchTab('admin')}catch(e){}}
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});async function bootApp(){try{if(/^WRK-[a-f0-9]{32}$/.test(LINK_REVIEW)){workerLinkMode=true;state=await call('portalData');showVer(state);$('identity').textContent='접속 계정: '+state.email;wkCheckIn();return}await bootPortal();if(/^MEET-[a-f0-9]{32}$/.test(LINK_REVIEW)){meetCheckIn();return}if(LINK_REVIEW&&(['ADMIN','SAFETY'].includes(state.role)||state.isApprover))switchTab('admin')}catch(e){}}
 
 /* ---------- v4.0 로그인 · 서버 연결 (GitHub 화면 → Apps Script Code.gs) ---------- */
 const CONF=window.APP_CONFIG||{};
@@ -369,9 +392,9 @@ function showApp(){$('loginView').hidden=true;$('appView').hidden=false;document
 let gsiDone=false;
 function renderGoogleBtn(){if(gsiDone)return;if(!window.google?.accounts?.id){setTimeout(renderGoogleBtn,300);return}gsiDone=true;google.accounts.id.initialize({client_id:CONF.CLIENT_ID,callback:onGoogleLogin,ux_mode:'popup'});google.accounts.id.renderButton($('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'})}
 async function onGoogleLogin(r){if(!r||!r.credential)return;const st=$('loginStatus');st.textContent='인증 정보를 확인하고 있습니다...';
- try{const d=await post_({op:'login',credential:r.credential,mode:isWorkerLink()?'':loginMode()});SESSION=d.key;try{sessionStorage.setItem('dsk',SESSION)}catch(e){}st.textContent='';showApp();bootApp()}catch(e){st.textContent='로그인 실패: '+e.message}}
+ try{const d=await post_({op:'login',credential:r.credential,mode:isWorkerLink()?'':loginMode()});SESSION=d.key;try{sessionStorage.setItem('dsk',SESSION)}catch(e){}try{const p=r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const j=JSON.parse(decodeURIComponent(escape(atob(p+'==='.slice((p.length+3)%4)))));setCUser(String(j.email||'').toLowerCase()+'|'+(isWorkerLink()?'':loginMode()))}catch(e){setCUser('')}st.textContent='';showApp();bootApp()}catch(e){st.textContent='로그인 실패: '+e.message}}
 /** 로그아웃: 저장된 로그인 정보 지우고 처음 화면으로 (주소창의 링크값도 정리) */
-function logout(note){try{sessionStorage.removeItem('dsk');if(note)sessionStorage.setItem('loginNote',note)}catch(e){}dirty=false;location.href=location.pathname}
+function logout(note){cacheClear();try{localStorage.removeItem('fcUser')}catch(e){}try{sessionStorage.removeItem('dsk');if(note)sessionStorage.setItem('loginNote',note)}catch(e){}dirty=false;location.href=location.pathname}
 function initLogin(){
  // 접속 구분: 마지막 선택 기억
  const radios=[...document.querySelectorAll('input[name=loginMode]')];
