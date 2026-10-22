@@ -75,7 +75,7 @@ function vEndHtml(v){if(v.jobStatus!=='ENDED')return '';const r=v.evalResult;
  return '<div class="card alertcard"><h2>공사가 종료되었습니다</h2>'+(r?'<p class="desc">도급인 종료 평가 ('+escapeText(r.date)+'): <b>'+r.total+'점</b> '+gradePill(r.grade)+'</p>'+(r.comment?'<div class="stage">개선사항</div><p class="desc" style="white-space:pre-line">'+escapeText(r.comment)+'</p>':''):'<p class="desc">도급인 담당자가 종료 평가를 진행하고 있습니다.</p>')+'</div>'}
 /* ---------- 안전보건팀: 참조 알림 ---------- */
 let noticeData=null;
-async function loadNotices(){if(noticeData)renderNotices();try{noticeData=await fetcher('notice')('noticeList');if(tab==='notice')renderNotices()}catch(e){}}
+async function loadNotices(){if(!noticeData)noticeData=cacheGet('noticeList',[]);if(noticeData){seenTab.notice=1;renderNotices()}try{noticeData=await fetcher('notice')('noticeList');if(tab==='notice')renderNotices()}catch(e){}}
 function renderNotices(){const d=noticeData,un=d.list.filter(n=>!n.read).length;
  $('notice').innerHTML='<div class="card"><div class="vh-top"><h2 style="margin:0">참조 알림 '+(un?'<span class="cnt">'+un+'</span>':'')+'</h2>'+(un?'<button class="button ghost" type="button" onclick="readAllNotices()">모두 읽음</button>':'')+'</div><p class="desc">승인할 일은 없습니다. 업체 평가 확정·공사 연장·공사 종료처럼 "이런 일이 있었다"는 기록입니다. 필요하면 공사·현장미팅에서 내용을 확인해 주세요.</p></div>'
   +'<div class="card">'+(d.list.map(n=>'<div class="item"><div>'+(n.read?'':'<span class="pill bad">새 알림</span> ')+'<span class="pill lock">'+escapeText(d.labels[n.type]||n.type)+'</span> <span class="muted">'+escapeText(fmtTime(n.time))+'</span></div><div class="desc" style="margin-top:4px;'+(n.read?'':'font-weight:600;color:var(--text)')+'">'+escapeText(n.text)+'</div></div>').join('')||'<p class="muted">아직 알림이 없습니다.</p>')+'</div>'}

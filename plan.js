@@ -66,7 +66,7 @@ function plMiss(n){const m=[];if(n===1){if(!pl.goal)m.push('f_plGoal');if(!pl.kp
 async function savePlanNow(){plCollect();const m=plMiss(5);if(m.length){inspFlag(m,m[0]==='sigBox'?'대표이사 서명을 해 주세요':'최근 3년 산재 건수를 적어 주세요 (없으면 0)');return}
  for(let i=1;i<=4;i++)if(plMiss(i).length){plStep=i;renderPlan();setTimeout(()=>inspFlag(plMiss(i),PL_STEPS[i-1]+' 단계에 빈 칸이 있습니다'),50);return}
  if(!confirm('안전보건관리계획서를 작성 완료할까요?\n\n위험작업 '+pl.works.length+'개 · 비상 시나리오 '+pl.scen.length+'개 · 증빙 '+pl.evidenceFiles.length+'건\n\n서명이 들어간 PDF가 만들어져 제출 서류로 등록됩니다.'))return;
- const btn=$('planSave');if(btn){btn.disabled=true;btn.textContent='계획서를 만드는 중… (20초 정도)'}
+ const before=((((state.docBoard||{}).rows||[]).find(x=>x.code==='C02')||{}).uploads||[]).length;const btn=$('planSave');if(btn){btn.disabled=true;btn.textContent='계획서를 만드는 중… (20초 정도)'}
  const d=Object.assign({},pl,{evidence:pl.evidenceFiles.map(f=>f.id)});delete d.evidenceFiles;
  try{const s=await call('savePlanDoc',d,sigData());try{localStorage.removeItem(plKey())}catch(e){}const el=$('csheet');if(el)el.style.display='none';document.body.style.overflow='';pl=null;display(s);setTimeout(()=>$('row_docC02')?.scrollIntoView({block:'center'}),100);msg('안전보건관리계획서 작성 완료 · 제출 서류로 등록했습니다.')}
- catch(e){if(btn){btn.disabled=false;btn.textContent='서명하고 작성 완료'}}}
+ catch(e){if(/연결하지 못했/.test(e&&e.message||'')){try{const s=await call('portalData');const r=((s.docBoard&&s.docBoard.rows)||[]).find(x=>x.code==='C02');if(r&&r.uploads.length>before){try{localStorage.removeItem(plKey())}catch(z){}const el=$('csheet');if(el)el.style.display='none';document.body.style.overflow='';pl=null;display(s);msg('안전보건관리계획서가 등록되었습니다.');return}}catch(x){}}if(btn){btn.disabled=false;btn.textContent='서명하고 작성 완료'}}}
