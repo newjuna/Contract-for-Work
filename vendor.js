@@ -12,7 +12,8 @@ const isVendorApproved=()=>!!(state&&!state.staff&&state.company&&state.company.
 const VJOB_MENUS=['workers','permit','meet','insp','drill'];
 const vOpenJobs=()=>vjobs&&vjobs.jobs?vjobs.jobs.filter(j=>j.status!=='ENDED').length:(state&&state.openJobs!=null?state.openJobs:1);
 function setupVMenu(){const ap=isVendorApproved(),open=ap&&vOpenJobs()>0,isJob=el=>!!el&&VJOB_MENUS.includes(String(el.id).replace('vm_',''));
- document.querySelectorAll('.vmb').forEach(b=>{const job=b.classList.contains('navh')?isJob(b.nextElementSibling):isJob(b);b.classList.toggle('hidden',!ap||(job&&!open))});
+ /* v5.20 메뉴 묶음(navg)은 안에 공사 업무 메뉴가 있으면 공사 업무로 봄 */
+ document.querySelectorAll('.vmb').forEach(b=>{const job=b.classList.contains('navg')?[...b.querySelectorAll('button[id]')].some(isJob):isJob(b);b.classList.toggle('hidden',!ap||(job&&!open))});
  if(ap&&!open&&VJOB_MENUS.includes(vmenu)&&!vjob)vmenu='dash';  // 종료 공사 기록을 보고 있을 때는 그대로
  $('myTab').classList.toggle('hidden',ap);if(!state.staff&&state.company)$('myTab').textContent=ap?'내 업무':'계약 전 서류';if(ap)markVMenu()}
 function markVMenu(){document.querySelectorAll('.vmb').forEach(b=>b.classList.toggle('active',b.id==='vm_'+vmenu));if(tab==='my'&&isVendorApproved())$('pageTitle').textContent=VMENU[vmenu]}
@@ -20,7 +21,7 @@ function markVMenu(){document.querySelectorAll('.vmb').forEach(b=>b.classList.to
 function vgo(m,id){if(!id&&VJOB_MENUS.includes(m)&&vOpenJobs()<1)m='dash';/* 진행 중 공사 없음 → 대시보드 (종료 공사 기록 보기는 id로 열림) */vmenu=m;if(id)vSel=id;toggleMenu(false);stopScan();MEET_TOKEN='';if(tab!=='my')switchTab('my');markVMenu();clearInterval(wkTimer);showQr=false;showAdd=false;window.scrollTo(0,0);
  if(!$('execArea')){renderMy();return}  // 참석 체크 화면 뒤에는 업체 화면을 다시 그림
  if(m==='meet'){renderVMeet();return}
- if(m==='dash'){vjob=null;loadMyJobs();return}if(m==='docs'){renderVDocs();return}if(m==='drill'){renderVDrill();return}vEnsureJob()}
+ if(m==='dash'){vjob=null;loadMyJobs(true);return}/* v5.20 가지고 있는 목록으로 바로 그리고, 20초 지났을 때만 뒤에서 새로 받음 */if(m==='docs'){renderVDocs();return}if(m==='drill'){renderVDrill();return}vEnsureJob()}
 /** 승인 후 화면 시작 (renderMy에서 호출) */
 function vStart(){markVMenu();if(vmenu==='meet')return renderVMeet();if(vmenu==='docs')return renderVDocs();if(vmenu==='drill')return renderVDrill();if(vmenu!=='dash'&&vjob)return renderVJob();loadMyJobs(true)/* v5.18 20초 안에 받은 목록이면 다시 받지 않음 */}
 async function vEnsureJob(){const el=$('execArea');if(!el)return;
