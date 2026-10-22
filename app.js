@@ -25,8 +25,10 @@ function cacheGet(n,a){if(!CUSER||!CACHE_FN.has(n))return null;try{const v=local
 function cacheSet(n,a,v){if(!CUSER||!CACHE_FN.has(n))return;try{localStorage.setItem(ck_(n,a),JSON.stringify(v))}catch(e){cacheClear()}}
 function cacheClear(){try{const ks=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('fc:'))ks.push(k)}ks.forEach(k=>localStorage.removeItem(k))}catch(e){}}
 function setCUser(u){u=String(u||'');if(u===CUSER)return;cacheClear();CUSER=u;try{localStorage.setItem('fcUser',u)}catch(e){}}
-function call(name,...args){if(READS.has(name)){barStart();return api(name,args).then(r=>{barEnd();cacheSet(name,args,r);return r},e=>{barEnd();msg(e.message||'불러오지 못했습니다.');throw e})}
- loadStart(name);return api(name,args).then(r=>{loadEnd();return r},e=>{loadEnd();msg(e.message||'처리에 실패했습니다.');throw e})}
+/* 로딩 창 규칙 (v5.9)
+ *  - call      : 로딩 창 (0.4초 안에 끝나면 안 뜸) → 처음 여는 화면 · 저장 · 제출 · 발행 · 승인 · 파일 만들기
+ *  - callQuiet : 로딩 창 없음 → 저장해 둔 화면을 먼저 보여 준 뒤 뒤에서 최신으로 바꿀 때 · 자동저장 · 알림 숫자 */
+function call(name,...args){loadStart(name);return api(name,args).then(r=>{loadEnd();cacheSet(name,args,r);return r},e=>{loadEnd();msg(e.message||'처리에 실패했습니다.');throw e})}
 /** 화면을 가리지 않는 조용한 호출 (자동저장용) */
 function callQuiet(name,...args){return api(name,args).then(r=>{cacheSet(name,args,r);return r})}
 function input(id,label,value='',type='text',disabled=false,ph=''){return `<div class="field"><label for="f_${id}">${escapeText(label)}</label><input id="f_${id}" type="${type}" value="${escapeText(value)}" ${ph?`placeholder="${escapeText(ph)}"`:''} ${disabled?'disabled':''}></div>`}
@@ -34,7 +36,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.21 v5.8';
+const UI_VERSION='26.10.21 v5.9';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -178,7 +180,7 @@ let jobData=null,roomTimer=null,roomId='';
 /* v4.2 빠른 화면 전환: 한 번 본 화면은 저장해 둔 내용을 바로 보여 주고, 최신 내용은 뒤에서 조용히 받아 바꿈 */
 const seenTab={};function fetcher(t){const f=seenTab[t]?callQuiet:call;seenTab[t]=1;return f}
 let jobsMode='list';
-async function loadJobs(){roomId='';jobsMode='list';if(!jobData){const c=cacheGet('jobBoard',[]);if(c)jobData=c}const old=jobData?JSON.stringify(jobData):'';if(jobData)renderJobs();try{const x=await fetcher('jobs')('jobBoard');jobData=x;if(tab==='jobs'&&jobsMode==='list'&&JSON.stringify(x)!==old)renderJobs()}catch(e){}}
+async function loadJobs(){roomId='';jobsMode='list';if(!jobData){const c=cacheGet('jobBoard',[]);if(c)jobData=c}if(jobData)seenTab.jobs=1;const old=jobData?JSON.stringify(jobData):'';if(jobData)renderJobs();try{const x=await fetcher('jobs')('jobBoard');jobData=x;if(tab==='jobs'&&jobsMode==='list'&&JSON.stringify(x)!==old)renderJobs()}catch(e){}}
 async function delJob(id){const j=jobData.jobs.find(x=>x.id===id);if(!j)return;const rec=(j.workerCount||j.crewDays)?'\n\n※ 이 공사에는 작업자 '+(j.workerCount||0)+'명, 작업인원 기록 '+(j.crewDays||0)+'일치가 있습니다. 함께 삭제됩니다.':'';
  if(!confirm('"'+j.title+'" 공사를 삭제할까요?\n참여 업체 배정 '+j.vendors.length+'곳, 미팅 '+j.meetings.length+'개도 함께 삭제되며 되돌릴 수 없습니다.'+rec))return;
  if(rec&&prompt('기록까지 삭제됩니다. 확인을 위해 공사명을 그대로 입력해 주세요.\n'+j.title)!==j.title){msg('공사명이 달라 삭제하지 않았습니다.');return}
@@ -294,11 +296,10 @@ async function sendCheckIn(e){e.preventDefault();const info={name:value('cName')
 /* ---------- v3.1 수행단계 (업체): 내 공사 → [오늘 할 일] / [비상대응훈련] ---------- */
 let vjobs=null,vjob=null,vtab='today',wkTimer=null,showQr=false,showAdd=false,workerLinkMode=false;
 const SIGN_LABEL={SELF:'✔ 본인 계정 서명',MANAGER:'✔ 소장 확인'};
-async function loadMyJobs(){const x=()=>$('execArea');const c=!vjobs&&cacheGet('myJobs',[]);if(c){vjobs=c;renderMyJobs()}try{vjobs=await callQuiet('myJobs');renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
+async function loadMyJobs(){const x=()=>$('execArea');const c=!vjobs&&cacheGet('myJobs',[]);if(c){vjobs=c;renderMyJobs()}try{vjobs=await (vjobs?callQuiet:call)('myJobs');renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
 function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
 async function openVJob(id){const c=cacheGet('vendorJob',[id]);vtab='today';showQr=false;showAdd=false;
  if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
- if($('execArea'))$('execArea').innerHTML='<div class="card"><p class="desc">공사 화면을 여는 중입니다…</p></div>';
  try{vjob=await call('vendorJob',id);renderVJob();window.scrollTo(0,0)}catch(e){}}
 function backJobs(){vgo('dash')}
 function setVTab(t){vtab=t;renderVJob()}
@@ -365,7 +366,12 @@ async function saveManual(e){e.preventDefault();await save(true)}
 async function goStep(n){if(dirty){if(!await save(false))return}activeStep=n;renderMy()}
 async function upload(){try{const f=await readFile($('evidence').files[0]);display(await call('uploadEvidence',f));msg('파일 첨부 완료')}catch(e){alert(e.message)}}
 async function viewFile(id){try{const f=await call('getMyFile',id);const bytes=atob(f.data),array=new Uint8Array(bytes.length);for(let i=0;i<bytes.length;i++)array[i]=bytes.charCodeAt(i);const url=URL.createObjectURL(new Blob([array],{type:f.mime}));const a=document.createElement('a');a.href=url;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}catch(e){}}
-async function submitAll(){if(dirty&&!await save(false))return;try{const missing=await call('checkSubmission');if(missing.length){markMissing(missing);return}if(!confirm('최종 제출 후 수정이 잠깁니다. 제출할까요?'))return;const r=await call('submitProfile');if(r.ok){await reload();msg('안전보건정보를 최종 제출했습니다.')}else msg('누락 항목이 있습니다.')}catch(e){}}
+function localMissing(){const data=((state.steps||[]).find(x=>Number(x.step)===1)||{}).data||{},m=[];
+ (state.fields[1]||[]).forEach(([k])=>{if(k==='note')return;const el=$('f_'+k),v=el&&!el.disabled?el.value.trim():String(data[k]||'').trim();if(!v)m.push({key:k})});
+ if(!state.testSkipFiles)((state.docBoard&&state.docBoard.rows)||[]).filter(r=>r.stage==='CONTRACT'&&r.vendorDoc&&r.required&&!r.uploads.length).forEach(r=>m.push({key:'doc'+r.code}));return m}
+async function submitAll(){const miss=localMissing();if(miss.length){markMissing(miss);msg(/^doc/.test(miss[0].key)?'제출 서류를 먼저 작성해 주세요':'빨간 칸을 채워 주세요');return}
+ if(!confirm('제출할까요?\n제출하면 검토가 끝날 때까지 수정할 수 없습니다.'))return;if(dirty&&!await save(false))return;
+ try{const r=await call('submitProfile');if(r.ok){display(await call('portalData'));msg('제출했습니다. 본사 담당자가 검토합니다.')}else{markMissing(r.missing||[]);msg('빈 항목이 있습니다.')}}catch(e){}}
 async function loadAdmin(){try{const a=await fetcher('admin')('applications');$('admin').innerHTML=`<div class="card"><h2>사업자 등록 신청 관리</h2><p class="desc">업체가 본인을 승인 담당자로 지정한 신청이 표시됩니다(관리자는 전체). 승인하면 업체 화면이 바로 작성 단계로 넘어갑니다.</p>${a.map(b=>`<div class="item" id="biz-${escapeText(b.id)}"><b>${escapeText(b.company)}</b> <span class="badge">${escapeText(b.status)}</span> ${b.duplicate==='Y'?'<span class="badge">중복 검토</span>':''}${b.certMissing?'<span class="pill todo">등록증 미첨부(테스트)</span>':''}<div class="desc">${escapeText(b.industry)} / ${escapeText(b.regNo)}<br>대표자 ${escapeText(b.representative)} / 담당자 ${escapeText(b.contact)}<br>주소 ${escapeText(b.address)}<br>업체 계정 ${escapeText(b.email||'')} · 지정 승인 담당자 ${escapeText(b.approverEmail||'(지정 없음)')}</div>${b.status==='PENDING'?`<div class="row">${b.certMissing?'':`<button class="button ghost" onclick="registrationDocs('${escapeText(b.id)}')">사업자등록증 확인</button>`}<button class="button" onclick="decide('${escapeText(b.id)}','APPROVE')">승인</button><button class="button ghost" onclick="decide('${escapeText(b.id)}','REJECT')">반려</button></div>`:''}</div>`).join('')||'<p>신청 내역이 없습니다.</p>'}</div>`;if(LINK_REVIEW){setTimeout(()=>$('biz-'+LINK_REVIEW)?.scrollIntoView({block:'center'}),100)}}catch(e){}}
 async function decide(id,decision){const reason=decision==='REJECT'?prompt('반려 사유를 입력하세요.'):'';if(decision==='REJECT'&&reason===null)return;if(!confirm(decision==='APPROVE'?'해당 업체를 승인할까요?\n승인하면 업체는 바로 안전보건정보 작성을 시작할 수 있습니다.':'해당 업체를 반려할까요?'))return;try{await call('decideBusiness',id,decision,reason);msg('처리했습니다.');loadAdmin()}catch(e){}}
 async function resend(id){if(!confirm('새 인증번호를 보내겠습니까?'))return;try{await call('resendOtp',id);msg('재발송했습니다.');loadAdmin()}catch(e){}}
