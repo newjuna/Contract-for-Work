@@ -67,7 +67,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.23 v5.25';
+const UI_VERSION='26.10.23 v5.26';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -261,9 +261,28 @@ const execOk_=s=>!!(s&&!s.staff&&s.company&&s.company.status==='VERIFIED'&&(s.co
 /** 내 정보를 받은 뒤: (pi 단계) 공사·업무 화면 미리 받기 → 화면 열기. pi<0이면 미리 받기 없이 바로 */
 /* v4: 내 정보 확인 뒤 화면부터 공개한다. 공사 목록은 독립 조회하므로 초기 화면을 막지 않는다.
  * 메뉴 진입 시 loadJobs / loadMyJobs 가 각각 서버 조회를 수행한다. */
+/* v5.26: 최초 로그인 체크리스트에서 배정 공사를 실제로 한 번만 조회한다.
+ *  8초 이상 걸리면 화면 사용을 허용하되 같은 서버 요청을 다시 보내지 않는다. */
+let loginJobsPending=null;
+function prepareLoginJobs(s,pi){
+ if(pi<0||!s||s.staff||!execOk_(s))return Promise.resolve();
+ bootSet(pi,'run');
+ const load=callQuiet('myJobs').then(r=>{
+  vjobs=r;vjobsAt=Date.now();cacheSet('myJobs',[],r);
+  if(state&&state.email===s.email&&tab==='my'&&$('execArea')&&!vjob){setupVMenu();renderMyJobs()}
+  bootSet(pi,'done');return r;
+ }).catch(e=>{bootSet(pi,'fail');return null}).finally(()=>{if(loginJobsPending===load)loginJobsPending=null});
+ loginJobsPending=load;
+ return new Promise(resolve=>{
+  let done=false;
+  const finish=()=>{if(done)return;done=true;resolve()};
+  load.then(finish);
+  setTimeout(()=>{if(!done){bootSet(pi,'skip');finish()}},8000);
+ });
+}
 async function bootRest(s,pi){
  setCUser(s.email+'|'+(s.mode||''));cacheSet('portalData',[],s);state=s;
- if(pi>=0)bootSet(pi,'skip');
+ if(pi>=0)await prepareLoginJobs(s,pi);
  const li=BOOT?BOOT.labels.length-1:0;
  bootSet(li,'run');display(s);bootSet(li,'done');
  setTimeout(bootEnd,180);
@@ -420,7 +439,7 @@ let vjobsAt=0;  // v5.18 공사 목록 받은 시각 (방금 받았으면 화면
 /* v5.20 가진 목록(메모리·이 기기 저장본)으로 먼저 바로 그림 → 뒤에서 새로 받아 바뀐 경우만 다시 그림 (예전: 대시보드를 누르면 서버 응답까지 이전 화면 그대로) */
 async function loadMyJobs(quick){const x=()=>$('execArea');if(!vjobs){const c=cacheGet('myJobs',[]);if(c)vjobs=c}
  const had=!!vjobs,old=had?JSON.stringify(vjobs):'';if(had){setupVMenu();renderMyJobs();if(quick&&Date.now()-vjobsAt<20000)return}
- try{const r=await (had||/^MEET-/.test(LINK_REVIEW)?callQuiet:call)('myJobs');/* 참석 QR 화면 위에 로딩 창을 띄우지 않음 */vjobsAt=Date.now();vjobs=r;if(!had){setupVMenu();renderMyJobs()}else if(JSON.stringify(r)!==old){setupVMenu();if(vmenu==='dash'&&!vjob)renderDash()}}catch(e){if(!had&&x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
+ try{const r=await (loginJobsPending||(had||/^MEET-/.test(LINK_REVIEW)?callQuiet:call)('myJobs'));/* 참석 QR 화면 위에 로딩 창을 띄우지 않음 */vjobsAt=Date.now();vjobs=r;if(!had){setupVMenu();renderMyJobs()}else if(JSON.stringify(r)!==old){setupVMenu();if(vmenu==='dash'&&!vjob)renderDash()}}catch(e){if(!had&&x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
 function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
 async function openVJob(id){const c=cacheGet('vendorJob',[id]);vtab='today';showQr=false;showAdd=false;
  if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vSel!==id||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
