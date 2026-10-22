@@ -58,18 +58,18 @@ function evMark(no,k){evCur.items[no].lv=k;$('ev_'+no).classList.remove('miss','
 async function saveEval(final){const c=evCur;c.comment=value('evCmt');
  if(final){const miss=evData.evalItems.filter(([no])=>!c.items[no].lv).map(([no])=>'ev_'+no);if(!String(c.items['12'].memo||'').trim())miss.push('f_evm12');
   if(miss.length){inspFlag(miss,miss[0]==='f_evm12'?'12번에 공사 중 사고 여부를 적어 주세요 (예: 무재해)':'체크하지 않은 항목이 있습니다');return}
-  const s=evScore(c.items);if(!confirm(c.e.company+' 종료 평가를 확정할까요?\n\n'+s.total+'점 · '+s.grade+'등급\n\n확정하면 결과지 PDF와 전체 활동내역 ZIP이 Drive에 보관되고, 안전보건팀에 참조 알림이 갑니다.'))return}
+  const s=evScore(c.items);if(!confirm(c.e.company+' 종료 평가를 확정할까요?\n\n'+s.total+'점 · '+s.grade+'등급\n\n확정하면 안전보건팀에 참조 알림이 갑니다.\n전체 활동내역 ZIP은 결과 화면에서 내려받습니다.'))return}
  try{evData=await call('saveJobEval',c.id,{items:c.items,comment:c.comment},final);const e=evData.list.find(x=>x.id===c.id);
   if(final){renderEvalDone(e);msg('평가를 확정했습니다.');refreshBadges()}else{c.e=e;msg('임시 저장했습니다.')}}catch(e){}}
 /* ---------- 확정된 평가 보기 + 내려받기 ---------- */
 function renderEvalDone(e){const d=evData,au=e.auto.items||{};jobsMode='eval';evCur=null;
  $('jobs').innerHTML='<div class="card"><button class="button ghost" type="button" onclick="renderEvalList()">← 업체 목록</button><h2 style="margin-top:12px">종료 평가 결과 · '+escapeText(e.company)+'</h2><div class="muted">'+escapeText(d.job.title)+' · '+escapeText(e.evaluator)+' · '+escapeText(fmtTime(e.evaluatedAt))+' · 안전보건팀 사후 검토 대상</div>'
   +'<div style="margin-top:12px"><b style="font-size:22px">'+e.total+'점</b> '+gradePill(e.grade)+'</div>'
-  +'<div class="row" style="margin-top:12px"><button class="button" type="button" style="flex:1" onclick="evFile(\''+escapeText(e.id)+'\',\'pdf\')">결과지 PDF</button><button class="button ghost" type="button" style="flex:1" onclick="evFile(\''+escapeText(e.id)+'\',\'zip\')">전체 활동내역 ZIP</button></div></div>'
+  +'<button class="button" type="button" style="width:100%;margin-top:12px" onclick="evFile(\''+escapeText(e.id)+'\')">📦 전체 활동내역 ZIP 내려받기</button><p class="muted" style="margin-top:6px">1.계약 전 서류 · 2.계약 전 평가 · 3.수행 기록 · 4.작업 종료 폴더로 나뉜 PDF 묶음 (같은 구조로 Drive에도 보관)</p></div>'
   +'<div class="card"><table class="rtable"><tr><th style="width:36px">No</th><th>항목</th><th style="width:60px">결과</th><th style="width:56px">점수</th></tr>'+d.evalItems.map(([no,,name])=>{const x=e.items[no]||{},P=d.points[no];return '<tr><td style="text-align:center">'+no+'</td><td><b>'+escapeText(name)+'</b><div class="muted">'+escapeText((au[no]||{}).why||'')+(x.memo?'<br>의견: '+escapeText(x.memo):'')+'</div></td><td style="text-align:center"'+(x.lv==='P'?' class="req"':'')+'>'+escapeText(EV_LV[x.lv]||'-')+'</td><td style="text-align:center">'+(x.lv?P['GNP'.indexOf(x.lv)]:0)+'/'+P[0]+'</td></tr>'}).join('')+'</table>'
   +'<div class="stage">개선사항</div><p class="desc" style="white-space:pre-line">'+escapeText(e.comment||'없음')+'</p></div>'
   +'<div class="card"><button class="button ghost" type="button" style="width:100%" onclick="reopenEval(\''+escapeText(e.id)+'\')">다시 수정</button></div>';window.scrollTo(0,0)}
-async function evFile(id,kind){try{saveBlob(await call('jobEvalFile',id,kind))}catch(e){}}
+async function evFile(id){try{saveBlob(await call('jobEvalFile',id));msg('전체 활동내역 ZIP을 내려받았습니다.')}catch(e){}}
 async function reopenEval(id){if(!confirm('확정을 풀고 다시 수정할까요?\n수정 후 다시 [평가 확정]을 눌러야 합니다.'))return;try{evData=await call('reopenJobEval',id);openEval(id);refreshBadges()}catch(e){}}
 /* ---------- 업체 화면: 종료된 공사 ---------- */
 function vEndHtml(v){if(v.jobStatus!=='ENDED')return '';const r=v.evalResult;
