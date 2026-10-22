@@ -13,19 +13,20 @@ const LINK_REVIEW=(new URLSearchParams(location.search).get('review')||'').repla
 let state=null,activeStep=1,saveTimer=null,dirty=false,tab='my',reviewing=null;
 const $=id=>document.getElementById(id),escapeText=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function msg(t){$('toast').textContent=t;$('toast').style.display='block';setTimeout(()=>$('toast').style.display='none',4500)}
-/* 로딩 진행률: 서버는 실제 진행률을 알려주지 않으므로 예상치로 92%까지 천천히 오르고, 완료되면 100% */
+/* 로딩 창 문구 (서버는 실제 진행률을 알려주지 않음) */
 const LOAD_MSG={portalData:'화면을 불러오는 중',registerBusiness:'신청서를 접수하는 중',uploadContractDoc:'파일을 올리는 중',uploadEvidence:'파일을 올리는 중',getTemplate:'샘플 양식을 내려받는 중',getMyFile:'파일을 내려받는 중',saveStep:'저장하는 중',submitProfile:'최종 제출하는 중',checkSubmission:'누락 항목을 확인하는 중',uploadTemplate:'양식을 등록하는 중',refreshTemplateFolders:'Drive 폴더를 확인하는 중',saveJob:'공사를 저장하는 중',jobBoard:'공사 목록을 불러오는 중',createMeeting:'미팅 방을 만드는 중',deleteJob:'공사를 삭제하는 중',deleteMeeting:'미팅 방을 삭제하는 중',meetingDetail:'미팅 방을 여는 중',vendorJob:'공사 화면을 여는 중',saveCrew:'오늘 인원을 저장하는 중',addWorker:'작업자를 등록하는 중',workerCheckIn:'등록하는 중',meetCheckIn:'참석을 확인하는 중',saveMeetingDocs:'점검표·회의록을 저장하는 중',completeMeeting:'미팅 실시 완료를 확정하는 중',reopenMeetingDocs:'완료를 취소하는 중',uploadMeetingPhoto:'사진을 올리는 중',getMeetingPhoto:'사진을 불러오는 중',getPermit:'작업허가서를 여는 중',issuePermit:'작업허가서를 발행하는 중',updatePermitProgress:'진행 기록을 저장하는 중',permitList:'작업허가서 목록을 불러오는 중',permitDetail:'작업허가서를 여는 중',approvePermit:'승인하는 중',editPermit:'수정 제출하는 중',withdrawPermit:'제출을 취소하는 중',uploadInspPhoto:'사진을 올리는 중',uploadInspPhotoStaff:'사진을 올리는 중',submitInspection:'순회점검을 제출하는 중',resolveFinding:'조치 결과를 등록하는 중',inspList:'순회점검일지를 불러오는 중',checkInspections:'확인 처리하는 중',inspMine:'일지를 불러오는 중',approvePermits:'허가서를 승인하는 중',vendorList:'업체 현황을 불러오는 중',saveRuleDoc:'서명이 들어간 규정 문서를 만드는 중',savePlanDoc:'안전보건관리계획서를 만드는 중',uploadPlanFile:'증빙을 올리는 중',extendJob:'공사를 연장하는 중',endJob:'공사를 종료하고 평가서를 만드는 중',jobEvalList:'종료 평가를 불러오는 중',saveJobEval:'평가를 저장하는 중',reopenJobEval:'확정을 푸는 중',jobEvalFile:'전체 활동내역 ZIP을 만드는 중 (처음 한 번은 1~2분)',noticeList:'참조 알림을 불러오는 중',readNotices:'읽음 처리하는 중'};
-let loadTimer=null,loadPct=0,loadCount=0,coverTimer=null;
-function loadStart(name){loadCount++;if(loadCount>1)return;loadPct=0;$('loadMsg').textContent=(LOAD_MSG[name]||'처리하는 중')+'입니다';$('loadHint').textContent='잠시만 기다려 주세요';loadShow();/* v4.2 0.4초 안에 끝나면 로딩 화면 안 띄움 */clearTimeout(coverTimer);coverTimer=setTimeout(()=>{if(loadCount)$('cover').style.display='flex'},400);const t0=Date.now();clearInterval(loadTimer);loadTimer=setInterval(()=>{loadPct+=(92-loadPct)*0.05;const s=(Date.now()-t0)/1000;$('loadHint').textContent=s<3?'잠시만 기다려 주세요':s<7?'입력한 내용을 확인하고 저장하는 중입니다 · 정상 진행 중':s<15?'구글 시트에 기록하고 있습니다 · 보통 5~15초 걸립니다':'서버 응답을 기다리고 있습니다 ('+Math.round(s)+'초) · 오류가 아니니 창을 닫지 마세요';loadShow()},150)}
-function loadShow(){const p=Math.min(100,Math.round(loadPct));$('loadBar').style.width=p+'%';$('loadPct').textContent=p}
-function loadEnd(){loadCount=Math.max(0,loadCount-1);if(loadCount)return;clearInterval(loadTimer);clearTimeout(coverTimer);loadPct=100;loadShow();setTimeout(()=>{if(!loadCount)$('cover').style.display='none'},250)}
+/* v5.20 가짜 %(92%에서 멈춰 보이던 것) 대신 '움직이는 막대 + 지난 초' — 멈춘 게 아니라 기다리는 중이라는 것을 그대로 보여 줌 */
+let loadTimer=null,loadCount=0,coverTimer=null;
+function loadStart(name){loadCount++;if(loadCount>1)return;const rd=READS.has(name);$('loadMsg').textContent=(LOAD_MSG[name]||'처리하는 중')+'입니다';$('loadHint').textContent='잠시만 기다려 주세요';$('loadSec').textContent='';/* v4.2 0.4초 안에 끝나면 로딩 화면 안 띄움 */clearTimeout(coverTimer);coverTimer=setTimeout(()=>{if(loadCount)$('cover').style.display='flex'},400);const t0=Date.now();clearInterval(loadTimer);
+ loadTimer=setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000);$('loadSec').textContent=s?s+'초':'';$('loadHint').textContent=s<3?'잠시만 기다려 주세요':s<10?(rd?'구글 시트에서 자료를 모으고 있습니다 · 정상 진행 중':'입력한 내용을 구글 시트에 기록하고 있습니다 · 정상 진행 중'):s<25?'보통 5~15초 걸립니다 · 오류가 아니니 그대로 기다려 주세요':'서버가 평소보다 느립니다 · 창을 닫지 말고 조금만 더 기다려 주세요'},500)}
+function loadEnd(){loadCount=Math.max(0,loadCount-1);if(loadCount)return;clearInterval(loadTimer);clearTimeout(coverTimer);setTimeout(()=>{if(!loadCount)$('cover').style.display='none'},120)}
 /* v5.8 빠른 화면: 조회는 화면을 가리지 않고 위쪽 얇은 선만 표시 · 저장·제출·파일 만들기만 로딩 창 */
 const READS=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard','meetingDetail','permitList','permitDetail','getPermit','inspList','inspMine','jobEvalList','noticeList','vendorList','staffList','templateAdminList','reviewList','applications','getReviewData','getMeetingPhoto','getInspPhoto','myBadges']);
 let barN=0,barT=null;
 function barStart(){barN++;$('topLoad')?.classList.add('on');clearTimeout(barT);barT=setTimeout(()=>{if(barN)$('topNote')?.classList.add('on')},700)}
 function barEnd(){barN=Math.max(0,barN-1);if(!barN){clearTimeout(barT);$('topLoad')?.classList.remove('on');$('topNote')?.classList.remove('on')}}
 /* 한 번 본 화면은 이 기기에 저장해 두고 다음에 바로 보여 줌 (뒤에서 최신으로 바꿈). 로그아웃하면 지움 */
-const CACHE_FN=new Set(['portalData','myJobs','jobBoard','vendorJob','noticeList','vendorList']);
+const CACHE_FN=new Set(['portalData','myJobs','jobBoard','vendorJob','noticeList','vendorList','getPermit']);
 let CUSER='';try{CUSER=localStorage.getItem('fcUser')||''}catch(e){}
 const ck_=(n,a)=>'fc:'+CUSER+':'+n+':'+JSON.stringify(a||[]);
 function cacheGet(n,a){if(!CUSER||!CACHE_FN.has(n))return null;try{const v=localStorage.getItem(ck_(n,a));return v?JSON.parse(v):null}catch(e){return null}}
@@ -43,7 +44,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.22 v5.19';
+const UI_VERSION='26.10.23 v5.20';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -51,8 +52,14 @@ function display(s){state=s;showVer(s);$('gearBtn').hidden=!s.isMaster;setTimeou
 /** ☰ 메뉴 열기·닫기 */
 function toggleMenu(open){const d=$('drawer');if(!d)return;const v=open===undefined?!d.classList.contains('open'):!!open;
  /* 닫힌 메뉴 안에 포커스가 남지 않게 (aria-hidden 경고) */if(!v&&d.contains(document.activeElement))document.activeElement.blur();
- d.classList.toggle('open',v);$('scrim').classList.toggle('open',v);d.setAttribute('aria-hidden',String(!v));$('menuBtn').setAttribute('aria-expanded',String(v));document.body.style.overflow=v?'hidden':''}
+ if(v)navAuto();d.classList.toggle('open',v);$('scrim').classList.toggle('open',v);d.setAttribute('aria-hidden',String(!v));$('menuBtn').setAttribute('aria-expanded',String(v));document.body.style.overflow=v?'hidden':''}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')toggleMenu(false)});
+/* v5.20 ☰ 메뉴 목차 접기·펼치기: 메뉴를 열 때 지금 보고 있는 묶음만 펼치고 나머지는 접음 → 휴대폰에서도 로그아웃까지 한 화면에 보임
+ *  접힌 묶음 제목 옆에는 안쪽 알림 숫자 합계를 표시 */
+function navSet(g,open){g.classList.toggle('fold',!open);const h=g.querySelector('.navh');if(h)h.setAttribute('aria-expanded',String(open));navDot(g)}
+function navDot(g){const h=g.querySelector('.navh');if(!h)return;const n=g.classList.contains('fold')?[...g.querySelectorAll('.navb button[data-n]')].filter(b=>!b.classList.contains('hidden')).reduce((s,b)=>s+(parseInt(b.dataset.n,10)||0),0):0;if(n>0)h.dataset.n=n>99?'99+':String(n);else delete h.dataset.n}
+function navFold(h){const g=h.closest('.navg');if(g)navSet(g,g.classList.contains('fold'))}
+function navAuto(){document.querySelectorAll('#navTabs .navg').forEach(g=>navSet(g,!!g.querySelector('.navb button.active')))}
 function renderMy(){const b=state.company;let html='';if(state.mode==='STAFF'&&!state.staff){$('my').innerHTML='<div class="card"><h2>다이소 직원 명단에 없는 계정입니다</h2><p class="desc">로그인 계정 <b>'+escapeText(state.email)+'</b> 은(는) 회사직원명단에 등록되어 있지 않습니다.<br>협력업체라면 로그인 화면에서 <b>[협력업체]</b>를 고르고 다시 로그인해 주세요.<br>다이소 직원이라면 안전보건팀에 계정 등록을 요청해 주세요.</p><button class="button" type="button" onclick="logout()">로그인 화면으로</button></div>';return}if(state.staff&&!b){$('my').innerHTML='<div class="card"><h2>'+escapeText(state.staff.name)+' 님 ('+escapeText(state.staff.roleLabel)+')</h2><p class="desc">아성다이소 직원 계정으로 로그인했습니다.<br>오른쪽 위 ☰ 메뉴에서 업무를 선택해 주세요.</p><button class="button" type="button" onclick="toggleMenu(true)">메뉴 열기</button></div>';return}if(!b||b.status==='REJECTED'){html=`<div class="card"><h2>사업자 등록 신청</h2>${b?`<div class="note">기존 신청이 반려되었습니다. 사유: ${escapeText(b.reason)}<br>새 신청은 관리자에게 문의해 주세요.</div>`:''}<p class="desc">처음 방문한 업체는 기본정보와 사업자등록증을 제출해 주세요. Google 로그인 계정 ${escapeText(state.email)}으로 접수됩니다.</p><details class="guide"><summary>작성 가이드</summary><div class="note">· 사업자등록번호·연락처는 하이픈(-)을 넣어도, 빼도 됩니다.<br>· 업체 이메일은 지금 로그인한 Google 계정 <b>${escapeText(state.email)}</b>(으)로 자동 등록되며, 승인 결과도 이 메일로 안내됩니다.<br>· <b>본사 승인 담당자 이메일</b>은 이 주소를 안내해 준 다이소 담당자에게 받은 메일 주소를 적어 주세요.</div></details><form onsubmit="register(event)">${(()=>{const T=state.testSkipFiles?testSample():{};return `<div class="split">${input('company','업체명',T.company,'text',false,'예: (주)○○인테리어')}${input('regNo','사업자등록번호 (10자리)',T.regNo,'text',false,'예: 123-45-67890')}${input('representative','대표자 성명',T.representative,'text',false,'예: 홍길동')}${input('address','사업장 주소',T.address,'text',false,'예: 서울시 ○○구 ○○로 12')}${input('contact','업체 담당자 성명',T.contact,'text',false,'예: 김담당 (신청하는 업체 직원)')}${input('phone','업체 담당자 연락처',T.phone,'tel',false,'예: 010-1234-5678')}${input('vendorEmail','업체 이메일 (로그인 계정 · 자동)',state.email,'email',true)}</div>${input('approverEmail','본사 승인 담당자 이메일 (다이소 담당자에게 받은 주소)','','email',false,'예: hong.gildong@daiso.co.kr')}<div class="field"><label for="f_industry">도급 업종</label><select id="f_industry"><option value="">업종 선택</option>${state.industries.map(x=>`<option ${x===T.industry?'selected':''}>${escapeText(x)}</option>`).join('')}</select></div>`})()}<div class="field"><label for="cert">사업자등록증 첨부 (PDF·JPG·PNG, 최대 5MB · 휴대폰 촬영 사진 가능)${state.testSkipFiles?' — <span style="color:#ce2a4b">테스트 기간에는 생략 가능</span>':''}</label><input type="file" id="cert" accept=".pdf,.jpg,.jpeg,.png"></div><label class="desc"><input type="checkbox" id="agree" ${state.testSkipFiles?'checked':''}>신청·계정 승인 및 서류 검토를 위한 담당자 정보 수집·이용에 동의합니다. (운영 전 개인정보 처리방침 확정 필요)</label><div class="line"></div><button class="button" type="submit">사업자 등록 신청</button></form></div>`}
 else if(b.status==='PENDING'){html=`<div class="card"><h2>${escapeText(b.company)}</h2><div class="note">사업자 등록 승인 대기 중입니다.<br>본사 승인 담당자 <b>${escapeText(b.approverEmail||'')}</b>에게 승인 요청 메일을 보냈습니다. 담당자가 메일의 링크에서 바로 승인합니다.<br>승인되면 이 화면에 안내 창이 뜨고 바로 작성 페이지로 넘어갑니다.${b.duplicate==='Y'?'<br><b>중복 사업자번호 검토 대상입니다.</b>':''}</div><p class="desc">신청 계정: ${escapeText(state.email)}<br><span id="pollInfo">승인 여부를 15초마다 자동으로 확인하고 있습니다.</span></p><button class="button ghost" onclick="checkApproval(true)">지금 확인하기</button></div>`}
 else if(b.status==='VERIFIED'){activeStep=1;html=vendorHomeHtml(b)}$('my').innerHTML=html;
@@ -202,16 +209,56 @@ function jumpTo(key){$('missing')?.remove();if(/^doc/.test(key)){const r=$('row_
 async function reload(){try{display(await call('portalData'))}catch(e){}}
 const busyView=()=>dirty||!!document.querySelector('#csheet[style*="block"],#psheet:not([hidden])')||(typeof jobsMode!=='undefined'&&tab==='jobs'&&!['list'].includes(jobsMode))||(typeof vjob!=='undefined'&&!!vjob);
 const noBadge=o=>JSON.stringify(Object.assign({},o,{badges:null}));
-async function bootPortal(){const c=cacheGet('portalData',[]);
- if(!c){let s;loadStart('portalData');try{s=await api('portalData',[])}catch(e){msg(e.message||'불러오지 못했습니다.');throw e}finally{loadEnd()}setCUser(s.email+'|'+(s.mode||''));cacheSet('portalData',[],s);display(s);return}
- display(c);callQuiet('portalData').then(s=>{if(!c.email||s.email!==c.email){setCUser(s.email+'|'+(s.mode||''));display(s);return}
+async function bootPortal(noPack){const c=cacheGet('portalData',[]);
+ /* v5.20 저장해 둔 화면이 없으면: 체크리스트로 준비 과정을 보여 주며 내 정보 → 공사·업무 화면을 한 번에 미리 받고 시작 */
+ if(!c){let s;bootUI(['저장된 로그인 확인','내 정보 불러오기'].concat(noPack?[]:['공사·업무 화면 미리 준비']).concat(['화면 열기']));bootSet(0,'done');bootSet(1,'run');bootSkip(()=>location.reload(),'새로 고침');
+  try{s=await api('portalData',[])}catch(e){bootEnd();msg(e.message||'불러오지 못했습니다.');throw e}bootSet(1,'done');await bootRest(s,noPack?-1:2);return}
+ display(c);if(!noPack&&c.company&&!c.staff){window.__pfAt=Date.now();callQuiet('bootPack').then(applyPack).catch(()=>{})}/* 업체: 공사 화면들을 뒤에서 한 번에 새로 받음 */
+ callQuiet('portalData').then(s=>{if(!c.email||s.email!==c.email){setCUser(s.email+'|'+(s.mode||''));display(s);return}
   if(noBadge(s)===noBadge(c)){state.badges=s.badges;showBadges(s.badges);return}if(busyView()){state=s;showBadges(s.badges)}else display(s)}).catch(e=>{popup('서버와 연결되지 않았습니다','지금 화면은 이 기기에 저장해 둔 이전 화면입니다.\n저장·제출이 되지 않을 수 있습니다.\n\n'+(e&&e.message||''),'확인')})}
+/* ---------- v5.20 시작 준비 체크리스트 ----------
+ *  로그인(또는 저장된 화면이 없을 때) → 단계마다 ✔ 표시 · 걸린 시간 표시
+ *  '공사·업무 화면 미리 준비'에서 공사 목록·공사 화면·오늘 허가서까지 한 번에 받아 둠 → 이후 메뉴는 바로 열림
+ *  오래 걸리면 안내 문구 + [건너뛰고 시작]/[처음부터 다시] 버튼 (사람들이 새로 고침을 반복하지 않게) */
+let BOOT=null;
+function bootUI(labels){let el=$('bootBox');if(!el){el=document.createElement('div');el.id='bootBox';document.body.appendChild(el)}
+ el.innerHTML='<div class="bootcard" role="status" aria-live="polite"><div class="lbrand"><i aria-hidden="true"></i>도급 안전관리</div><h2>시작 준비 중</h2><p class="muted bootsub">필요한 화면을 먼저 받아 두고 시작합니다. 받아 두면 메뉴가 바로 열립니다.</p><ol class="bootlist">'
+  +labels.map((l,i)=>'<li id="bt_'+i+'" class="wait"><i aria-hidden="true"></i><span>'+escapeText(l)+'</span><em id="bts_'+i+'"></em></li>').join('')+'</ol><p class="bootnote" id="bootNote"></p><button class="button ghost" type="button" id="bootBtn" hidden></button><div class="lver">'+escapeText(UI_VERSION)+'</div></div>';
+ el.hidden=false;if(BOOT)clearInterval(BOOT.tm);BOOT={labels,st:labels.map(()=>'wait'),s0:[],fn:null,fnLabel:'',tm:setInterval(bootTick,500)};bootTick()}
+function bootSet(i,s){if(!BOOT||BOOT.labels[i]==null)return;const li=$('bt_'+i),tx=$('bts_'+i),now=Date.now();
+ if(s==='run')BOOT.s0[i]=now;else if(tx)tx.textContent=s==='skip'?'나중에 받음':s==='fail'?'건너뜀':BOOT.s0[i]&&now-BOOT.s0[i]>=100?((now-BOOT.s0[i])/1000).toFixed(1)+'초':'';
+ BOOT.st[i]=s;if(li)li.className=s;if(s!=='run'){BOOT.fn=null;const b=$('bootBtn');if(b)b.hidden=true}bootTick()}
+function bootSkip(fn,label){if(BOOT){BOOT.fn=fn;BOOT.fnLabel=label}}
+function bootTick(){if(!BOOT)return;const i=BOOT.st.indexOf('run'),n=$('bootNote'),b=$('bootBtn');if(i<0){if(n)n.textContent='';return}
+ const e=Math.floor((Date.now()-BOOT.s0[i])/1000),tx=$('bts_'+i);if(tx)tx.textContent=e?e+'초':'';
+ if(n)n.textContent=e<5?'':e<15?'구글 서버에서 자료를 모으고 있습니다 · 정상 진행 중입니다':e<30?'처음 접속이거나 사용자가 많으면 20초 정도 걸릴 수 있습니다 · 오류가 아닙니다':'평소보다 오래 걸리고 있습니다 ('+e+'초). 그대로 기다리거나 아래 버튼을 눌러 주세요.';
+ if(b&&b.hidden&&BOOT.fn&&e>=(BOOT.fnLabel==='건너뛰고 시작'?8:25)){b.textContent=BOOT.fnLabel;b.onclick=()=>{const f=BOOT&&BOOT.fn;if(f)f()};b.hidden=false}}
+function bootEnd(){const el=$('bootBox');if(el)el.hidden=true;if(BOOT)clearInterval(BOOT.tm);BOOT=null}
+const execOk_=s=>!!(s&&!s.staff&&s.company&&s.company.status==='VERIFIED'&&(s.company.submissionStatus==='APPROVED'||s.company.renewAt));
+/** 내 정보를 받은 뒤: (pi 단계) 공사·업무 화면 미리 받기 → 화면 열기. pi<0이면 미리 받기 없이 바로 */
+async function bootRest(s,pi){setCUser(s.email+'|'+(s.mode||''));cacheSet('portalData',[],s);state=s;
+ if(pi>=0){if(s.staff||execOk_(s)){bootSet(pi,'run');window.__pfAt=Date.now();let skip;const sk=new Promise(r=>skip=r);bootSkip(()=>skip(),'건너뛰고 시작');
+   const pk=callQuiet('bootPack').then(p=>{applyPack(p);bootSet(pi,'done')},()=>bootSet(pi,'fail'));await Promise.race([pk,sk]);if(BOOT&&BOOT.st[pi]==='run')bootSet(pi,'skip')}else bootSet(pi,'done')}
+ const li=BOOT?BOOT.labels.length-1:0;bootSet(li,'run');display(s);bootSet(li,'done');setTimeout(bootEnd,350)}
+/** 미리 받은 자료를 이 기기 저장본·메모리에 넣음 (늦게 도착해도 지금 보고 있는 목록 화면이면 다시 그림) */
+function applyPack(p){if(!p)return;const now=Date.now();
+ if(p.jobBoard){jobData=p.jobBoard;jobAt=now;seenTab.jobs=1;cacheSet('jobBoard',[],p.jobBoard);if(state&&state.staff&&tab==='jobs'&&jobsMode==='list')renderJobs()}
+ if(p.myJobs){const old=vjobs?JSON.stringify(vjobs):'';vjobs=p.myJobs;vjobsAt=now;window.__pfAt=now;cacheSet('myJobs',[],p.myJobs);
+  const typing=()=>document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+  Object.entries(p.vendorJob||{}).forEach(([id,v])=>{if(!v)return;cacheSet('vendorJob',[id],v);if(v.permitToday)cacheSet('getPermit',[id,v.today],v.permitToday);
+   if(vjob&&vjob.job.id===id&&JSON.stringify(vjob)!==JSON.stringify(v)&&!typing()&&!document.querySelector('#psheet:not([hidden])')){vjob=v;renderVJob()}});
+  if(state&&tab==='my'&&vmenu==='dash'&&!vjob&&$('execArea')&&JSON.stringify(vjobs)!==old){setupVMenu();renderDash()}}}
+/** 작업자 등록 QR로 로그인: 로그인 응답에 등록 화면이 같이 옴 (왕복 1번) */
+function workerBoot(d){workerLinkMode=true;state={email:d.email||'',appVersion:d.appVersion};showVer(state);$('identity').textContent='접속 계정: '+state.email;
+ if(d.wk)showWk(d.wk);else $('my').innerHTML='<div class="card"><h2>작업자 등록 실패</h2><p class="desc">'+escapeText(d.bootError||'')+'</p><button class="button ghost" type="button" onclick="wkCheckIn()">다시 시도</button></div>';
+ $('pageTitle').textContent='작업자 등록';window.scrollTo(0,0)}
 /* ---------- v2.9 공사·현장미팅 (직원) ---------- */
 let jobData=null,roomTimer=null,roomId='';
 /* v4.2 빠른 화면 전환: 한 번 본 화면은 저장해 둔 내용을 바로 보여 주고, 최신 내용은 뒤에서 조용히 받아 바꿈 */
 const seenTab={};function fetcher(t){const f=seenTab[t]?callQuiet:call;seenTab[t]=1;return f}
 let jobsMode='list';
-async function loadJobs(){roomId='';jobsMode='list';if(!jobData){const c=cacheGet('jobBoard',[]);if(c)jobData=c}if(jobData)seenTab.jobs=1;const old=jobData?JSON.stringify(jobData):'';if(jobData)renderJobs();try{const x=await fetcher('jobs')('jobBoard');jobData=x;if(tab==='jobs'&&jobsMode==='list'&&JSON.stringify(x)!==old)renderJobs()}catch(e){}}
+let jobAt=0;  // v5.20 공사 목록 받은 시각 (15초 안이면 다시 받지 않음)
+async function loadJobs(){roomId='';jobsMode='list';if(!jobData){const c=cacheGet('jobBoard',[]);if(c)jobData=c}if(jobData)seenTab.jobs=1;const old=jobData?JSON.stringify(jobData):'';if(jobData)renderJobs();if(jobData&&Date.now()-jobAt<15000)return;try{const x=await fetcher('jobs')('jobBoard');jobData=x;jobAt=Date.now();if(tab==='jobs'&&jobsMode==='list'&&JSON.stringify(x)!==old)renderJobs()}catch(e){}}
 async function delJob(id){const j=jobData.jobs.find(x=>x.id===id);if(!j)return;const rec=(j.workerCount||j.crewDays)?'\n\n※ 이 공사에는 작업자 '+(j.workerCount||0)+'명, 작업인원 기록 '+(j.crewDays||0)+'일치가 있습니다. 함께 삭제됩니다.':'';
  if(!confirm('"'+j.title+'" 공사를 삭제할까요?\n참여 업체 배정 '+j.vendors.length+'곳, 미팅 '+j.meetings.length+'개도 함께 삭제되며 되돌릴 수 없습니다.'+rec))return;
  if(rec&&prompt('기록까지 삭제됩니다. 확인을 위해 공사명을 그대로 입력해 주세요.\n'+j.title)!==j.title){msg('공사명이 달라 삭제하지 않았습니다.');return}
@@ -342,7 +389,10 @@ async function sendCheckIn(e){e.preventDefault();const info={name:value('cName')
 let vjobs=null,vjob=null,vtab='today',wkTimer=null,showQr=false,showAdd=false,workerLinkMode=false;
 const SIGN_LABEL={SELF:'✔ 본인 계정 서명',MANAGER:'✔ 소장 확인'};
 let vjobsAt=0;  // v5.18 공사 목록 받은 시각 (방금 받았으면 화면만 다시 그림)
-async function loadMyJobs(quick){const x=()=>$('execArea');if(quick&&vjobs&&Date.now()-vjobsAt<20000){setupVMenu();renderMyJobs();return}const c=!vjobs&&cacheGet('myJobs',[]);if(c){vjobs=c;setupVMenu();renderMyJobs()}try{vjobs=await (vjobs?callQuiet:call)('myJobs');vjobsAt=Date.now();setupVMenu();renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
+/* v5.20 가진 목록(메모리·이 기기 저장본)으로 먼저 바로 그림 → 뒤에서 새로 받아 바뀐 경우만 다시 그림 (예전: 대시보드를 누르면 서버 응답까지 이전 화면 그대로) */
+async function loadMyJobs(quick){const x=()=>$('execArea');if(!vjobs){const c=cacheGet('myJobs',[]);if(c)vjobs=c}
+ const had=!!vjobs,old=had?JSON.stringify(vjobs):'';if(had){setupVMenu();renderMyJobs();if(quick&&Date.now()-vjobsAt<20000)return}
+ try{const r=await (had||/^MEET-/.test(LINK_REVIEW)?callQuiet:call)('myJobs');/* 참석 QR 화면 위에 로딩 창을 띄우지 않음 */vjobsAt=Date.now();vjobs=r;if(!had){setupVMenu();renderMyJobs()}else if(JSON.stringify(r)!==old){setupVMenu();if(vmenu==='dash'&&!vjob)renderDash()}}catch(e){if(!had&&x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
 function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
 async function openVJob(id){const c=cacheGet('vendorJob',[id]);vtab='today';showQr=false;showAdd=false;
  if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
@@ -385,7 +435,7 @@ function showRules(date){const v=vjob,h=v.history.find(x=>x.date===date)||v.toda
  +'<div class="sheet-d">'+escapeText(y)+' 년 '+Number(m)+' 월 '+Number(d)+' 일</div><table class="rtable"><tr><th>현장명</th><td colspan="2">다이소 '+escapeText(v.job.storeName)+'</td></tr><tr><th>현장책임자</th><td colspan="2">'+escapeText(h.siteManager)+'</td></tr><tr><th>작업자<br>'+h.count+'명</th><th>공정명</th><th>이름 · 서명</th></tr>'
  +h.workers.map(w=>'<tr><td></td><td>'+escapeText(w.trade||'')+'</td><td><b>'+escapeText(w.name)+'</b> <span class="sg">'+escapeText(SIGN_LABEL[w.sign]||'✔')+'</span></td></tr>').join('')+'</table><p class="muted" style="margin-top:8px">본인 계정 서명: 처음 등록한 날 본인 Google 계정으로 서명 · 소장 확인: 업체 대표 계정으로 그날 출근을 확인 · 저장 '+escapeText(fmtTime(h.savedAt))+'</p></div>';window.scrollTo(0,0)}
 /* ---------- v3.1 작업자 등록 QR로 들어온 계정 ---------- */
-async function wkCheckIn(info){const token=LINK_REVIEW.slice(4);try{const r=await call('workerCheckIn',token,info||null);showWk(r)}catch(e){$('my').innerHTML='<div class="card"><h2>작업자 등록 실패</h2><p class="desc">'+escapeText(e.message||'')+'</p></div>'}$('pageTitle').textContent='작업자 등록';window.scrollTo(0,0)}
+async function wkCheckIn(info){const token=LINK_REVIEW.slice(4);try{const r=await call('workerCheckIn',token,info||null);if(r&&r.email&&state){state.email=r.email;$('identity').textContent='접속 계정: '+r.email}showWk(r)}catch(e){$('my').innerHTML='<div class="card"><h2>작업자 등록 실패</h2><p class="desc">'+escapeText(e.message||'')+'</p></div>'}$('pageTitle').textContent='작업자 등록';window.scrollTo(0,0)}
 function showWk(r){const head='<div class="card"><small class="muted">'+escapeText(r.store)+' · '+escapeText(r.company)+' ('+escapeText(r.trade)+')</small><h2>작업자 등록 · 신규자 교육</h2>';let body='';
  if(r.state==='DONE')body='<div style="text-align:center;padding:10px 0"><div style="font-size:44px;color:var(--ok)">✔</div><h2 style="color:var(--ok)">'+(r.again?'이미 등록되어 있습니다':'등록 완료')+'</h2><p class="desc"><b>'+escapeText(r.name)+'</b> · '+escapeText(r.role)+' · '+escapeText(r.company)+'<br>교육 확인 '+escapeText(fmtTime(r.eduAt))+' · 계정 '+escapeText(state.email)+'</p><div class="note" style="text-align:left">이 공사에서는 다시 QR을 찍지 않아도 됩니다.<br>내일부터는 소장님이 출근 인원을 체크합니다.</div></div>';
  else body='<p class="desc">로그인 계정 <b>'+escapeText(state.email)+'</b> 으로 등록합니다. <b>본인 계정</b>인지 확인해 주세요. 이 공사에서 처음 한 번만 하면 됩니다. <button class="linkbtn" type="button" onclick="relogin()">다른 계정으로 로그인</button></p><form onsubmit="sendWk(event)">'+input('kName','이름','','text',false,'예: 홍길동')+'<div class="split"><div class="field"><label for="f_kRole">구분</label><select id="f_kRole">'+r.roles.map(x=>'<option '+(x==='근로자'?'selected':'')+'>'+escapeText(x)+'</option>').join('')+'</select></div>'+input('kTrade','공정명 (선택)','','text',false,'예: 목공, 전기')+'</div>'
@@ -427,7 +477,7 @@ async function downloadAdminFile(id,doc){try{const f=await call('getInternalFile
 async function loadReview(){try{const a=await fetcher('review')('reviewList');$('review').innerHTML=`<div class="card"><h2>안전보건정보 제출·검토</h2>${a.map(b=>`<div class="item"><b>${escapeText(b.company)}</b> · <span class="badge">${escapeText(b.submissionStatus)}</span><div class="desc">${escapeText(b.industry)}</div><button class="button ghost" onclick="openReview('${escapeText(b.id)}')">제출 정보 확인</button></div>`).join('')}</div><div id="reviewDetail"></div>`}catch(e){}}
 async function openReview(id){try{reviewing=await call('getReviewData',id);const b=reviewing.company;$('reviewDetail').innerHTML=`<div class="card"><h2>${escapeText(b.company)} · 제출 내용</h2>${reviewing.steps.map(s=>`<div class="item"><b>${escapeText(state.stepNames[Number(s.step)-1])}</b>${Object.entries(s.data).map(([k,v])=>`<p class="desc">${escapeText(k)}: ${escapeText(v)}</p>`).join('')}</div>`).join('')}<div class="line"></div><div class="desc">증빙: ${reviewing.documents.map(f=>`<a onclick="downloadAdminFile('${escapeText(b.id)}','${escapeText(f.id)}')">${escapeText(f.name)}</a>`).join(' / ')}</div><div class="line"></div><b>계약 단계 제출서류</b>${(reviewing.docSubmissions||[]).map(t=>`<div class="item"><b>${escapeText(t.name)}</b>${t.required?'<span class="badge" style="margin-left:6px">필수</span>':''}${t.uploads.length?`<span class="pill ok">v${escapeText(t.uploads[0].version)}</span>`:'<span class="pill todo">미등록</span>'} <span class="muted">보완키 4:doc${escapeText(t.code)}</span><div class="desc">${t.uploads.map(u=>`<a onclick="downloadAdminFile('${escapeText(b.id)}','${escapeText(u.id)}')">v${escapeText(u.version)} ${escapeText(u.name)}</a> <span class="muted">${escapeText(fmtTime(u.uploadedAt))}</span>`).join('<br>')||'등록된 파일 없음'}</div></div>`).join('')||'<p class="desc">설정된 제출서류가 없습니다.</p>'}<p>보완 요청(단계:항목명 형식, 예: 2:safetyManager, 서류는 4:docC01, 쉼표로 구분)</p><input id="corKeys" placeholder="2:safetyManager,3:riskFactors" style="padding:12px;width:100%"><textarea id="corReason" style="margin:9px 0;width:100%;min-height:70px;padding:10px" placeholder="보완 요청 사유"></textarea><div class="row"><button class="button ghost" onclick="reviewIt('${escapeText(b.id)}','CORRECT')">보완 요청</button><button class="button dark" onclick="reviewIt('${escapeText(b.id)}','CONTRACT_OK')">계약담당 1차 확인 완료</button><button class="button" onclick="reviewIt('${escapeText(b.id)}','SAFETY_OK')">안전보건팀 최종 승인</button></div><p class="desc">실제 법정 적격성 배점과 PDF 출력은 후속 모듈로 별도 개발됩니다. 이 버튼은 절차 상태 확인용입니다.</p></div>`}catch(e){}}
 async function reviewIt(id,decision){if(!confirm('검토 결과를 반영할까요?'))return;try{const reason=$('corReason')?.value||'',keys=($('corKeys')?.value||'').split(',').map(s=>s.trim()).filter(Boolean);await call('reviewAction',id,decision,reason,keys);msg('검토 결과 저장');loadReview()}catch(e){}}
-window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});async function bootApp(){try{if(/^WRK-[a-f0-9]{32}$/.test(LINK_REVIEW)){workerLinkMode=true;state=await call('portalData');showVer(state);$('identity').textContent='접속 계정: '+state.email;wkCheckIn();return}await bootPortal();if(/^MEET-[a-f0-9]{32}$/.test(LINK_REVIEW)){meetCheckIn();return}if(LINK_REVIEW&&(['ADMIN','SAFETY'].includes(state.role)||state.isApprover))switchTab('admin')}catch(e){}}
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue=''}});async function bootApp(){try{if(/^WRK-[a-f0-9]{32}$/.test(LINK_REVIEW)){/* v5.20 내 정보(portalData) 없이 등록 화면만 바로 받음 (왕복 1번 줄임) */workerLinkMode=true;state={email:''};showVer(state);wkCheckIn();return}const mt=/^MEET-[a-f0-9]{32}$/.test(LINK_REVIEW);await bootPortal(mt);if(mt){meetCheckIn();return}if(LINK_REVIEW&&(['ADMIN','SAFETY'].includes(state.role)||state.isApprover))switchTab('admin')}catch(e){}}
 
 /* ---------- v4.0 로그인 · 서버 연결 (GitHub 화면 → Apps Script Code.gs) ---------- */
 const CONF=window.APP_CONFIG||{};
@@ -440,7 +490,9 @@ const RETRY_OK=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard',
 async function post_(body){if(!EXEC_OK)throw Error('config.js에 Apps Script 주소(/exec)가 등록되지 않았습니다.');
  const again=body.op==='login'||RETRY_OK.has(body.fn);let o,last;
  for(let i=0;i<(again?3:1);i++){if(i)await new Promise(r=>setTimeout(r,800*i));
-  try{const r=await fetch(CONF.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),cache:'no-store'});o=await r.json();last=null;break}catch(e){last=e}}
+  /* v5.20 다시 보내도 되는 요청은 45초 넘게 응답이 없으면 끊고 다시 보냄 (응답이 중간에 사라져 끝없이 기다리던 경우) */
+  const ac=again&&window.AbortController?new AbortController():null,tt=ac?setTimeout(()=>ac.abort(),45000):0;
+  try{const r=await fetch(CONF.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),cache:'no-store',signal:ac?ac.signal:undefined});o=await r.json();last=null;break}catch(e){last=e}finally{clearTimeout(tt)}}
  if(!last&&o&&o.ok&&body.op==='call')sessTouch();  // v5.18 쓰는 동안은 이 기기 로그인 유지
  if(last)throw Error(again?'서버 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.':'서버 응답을 받지 못했습니다. 처리가 되었을 수 있으니, 화면을 새로 고쳐 결과를 먼저 확인한 뒤 다시 시도해 주세요.');
  if(!o||!o.ok)throw Error((o&&o.error)||'처리에 실패했습니다.');return o.data}
@@ -451,15 +503,25 @@ const isWorkerLink=()=>/^WRK-/.test(LINK_REVIEW);
 function loginMode(){const r=document.querySelector('input[name=loginMode]:checked');return r?r.value:'VENDOR'}
 function loginHelp(){$('loginHelp').textContent=isWorkerLink()?'소장님이 보여 준 QR로 들어왔습니다. 이 공사에서 처음 한 번만 등록하면 됩니다.':LOGIN_HELP[loginMode()]}
 function showLogin(note){$('appView').hidden=true;$('loginView').hidden=false;document.title='도급 안전관리 | 로그인';$('loginStatus').textContent=note||'';renderGoogleBtn()}
-function showApp(){$('loginView').hidden=true;$('appView').hidden=false;document.title='도급 안전관리'}
+function showApp(){$('loginView').hidden=true;$('appView').hidden=false;document.title='도급 안전관리';navInit()}
 let gsiDone=false;
 let gsiWait=0;
 function renderGoogleBtn(){if(gsiDone)return;if(!window.google?.accounts?.id){gsiWait++;
   /* v5.18 10초 넘게 구글 로그인 버튼을 못 받으면 안내 (회사 와이파이·느린 데이터·광고 차단) */
   if(gsiWait===34&&!$('gsiSlow')){const p=document.createElement('p');p.id='gsiSlow';p.className='lstatus';p.innerHTML='구글 로그인 버튼을 불러오지 못하고 있습니다.<br>와이파이/데이터를 바꾸거나, 광고 차단을 끄거나, 크롬·사파리로 다시 열어 주세요. <button class="button ghost" type="button" style="margin-top:8px" onclick="location.reload()">다시 불러오기</button>';$('googleBtn').after(p)}
   setTimeout(renderGoogleBtn,300);return}gsiDone=true;$('gsiSlow')?.remove();google.accounts.id.initialize({client_id:CONF.CLIENT_ID,callback:onGoogleLogin,ux_mode:'popup'});google.accounts.id.renderButton($('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'})}
-async function onGoogleLogin(r){if(!r||!r.credential)return;const st=$('loginStatus');st.textContent='인증 정보를 확인하고 있습니다...';
- try{const d=await post_({op:'login',credential:r.credential,mode:isWorkerLink()?'':loginMode()});SESSION=d.key;sessSave(SESSION);try{const p=r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const j=JSON.parse(decodeURIComponent(escape(atob(p+'==='.slice((p.length+3)%4)))));setCUser(String(j.email||'').toLowerCase()+'|'+(isWorkerLink()?'':loginMode()))}catch(e){setCUser('')}st.textContent='';showApp();bootApp()}catch(e){st.textContent='로그인 실패: '+e.message}}
+/* v5.20 로그인 = 왕복 1번에 내 정보(또는 QR 등록·참석 화면)까지 받음 → 이어서 공사·업무 화면 미리 받기 (체크리스트로 진행 표시) */
+async function onGoogleLogin(r){if(!r||!r.credential)return;const st=$('loginStatus'),wk=isWorkerLink(),mt=/^MEET-[a-f0-9]{32}$/.test(LINK_REVIEW);st.textContent='';
+ bootUI(wk?['구글 계정 확인','서버 로그인 · 등록 화면 준비']:mt?['구글 계정 확인','서버 로그인 · 참석 화면 준비','화면 열기']:['구글 계정 확인','서버 로그인 · 내 정보 불러오기','공사·업무 화면 미리 준비','화면 열기']);
+ bootSet(0,'done');bootSet(1,'run');bootSkip(()=>location.reload(),'처음부터 다시');
+ let d;try{d=await post_({op:'login',credential:r.credential,mode:wk?'':loginMode(),boot:wk||mt?LINK_REVIEW:'1'})}catch(e){bootEnd();st.textContent='로그인 실패: '+e.message;return}
+ SESSION=d.key;sessSave(SESSION);try{const p=r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const j=JSON.parse(decodeURIComponent(escape(atob(p+'==='.slice((p.length+3)%4)))));setCUser(String(j.email||'').toLowerCase()+'|'+(wk?'':loginMode()))}catch(e){setCUser('')}
+ bootSet(1,'done');showApp();
+ if(wk){bootEnd();if(d.wk||d.bootError)workerBoot(d);else bootApp();return}
+ if(!d.portal){bootEnd();bootApp();return}  // 서버(Code.gs)가 아직 예전 버전이면 예전 방식
+ try{await bootRest(d.portal,mt?-1:2)}catch(e){bootEnd();msg(e.message||'화면을 열지 못했습니다.');return}
+ if(mt){if(d.meet){showCheckIn(d.meet);switchTab('my');$('my').scrollIntoView()}else meetCheckIn();return}
+ if(LINK_REVIEW&&(['ADMIN','SAFETY'].includes(state.role)||state.isApprover))switchTab('admin')}
 /** 로그아웃: 저장된 로그인 정보 지우고 처음 화면으로 (주소창의 링크값도 정리) */
 function logout(note){cacheClear();try{localStorage.removeItem('fcUser')}catch(e){}sessClear();try{if(note)sessionStorage.setItem('loginNote',note)}catch(e){}dirty=false;location.href=location.pathname}
 /** QR·링크 화면에서 다른 계정으로 (주소의 링크값은 그대로 두고 로그인만 다시) */
@@ -480,6 +542,34 @@ function inAppBox(){const n=inAppName();if(!n)return;const box=document.createEl
   +'<div style="display:grid;gap:8px;margin-top:10px"><button class="button" type="button" onclick="openOutside()">'+(IS_IOS&&!/KAKAOTALK/i.test(UA)?'주소 복사하기':(IS_IOS?'Safari':'크롬')+'로 열기')+'</button>'
   +(IS_IOS&&!/KAKAOTALK/i.test(UA)?'<span class="muted">또는 오른쪽 위·아래의 ··· / 공유 버튼 → "Safari로 열기"</span>':'<button class="button ghost" type="button" onclick="copyLoginLink()">주소 복사하기</button>')+'</div>';
  const g=$('googleBtn');g.parentNode.insertBefore(box,g)}
+/* ---------- v5.20 뒤로 가기 (화면 위 ‹ 버튼 + 휴대폰 뒤로 버튼·밀어서 뒤로) ----------
+ *  예전: 휴대폰 뒤로 버튼 = 사이트를 벗어남(새로 고침처럼 처음부터). 이제 앱 안에서 한 단계씩 뒤로:
+ *  안내 창 → 메뉴 → 허가서·규정·계획서 작성 화면 → 화면 안 [← …] 버튼 → 입력 양식 → 대시보드
+ *  대시보드에서 한 번 더 누르면 "한 번 더 누르면 나갑니다" 안내 후 2.5초 안에 다시 누를 때만 나감 */
+function backAction(){
+ if(BOOT)return null;
+ const md=$('modal');if(md&&md.style.display==='flex')return ()=>{const c=$('modalCancel');(c&&!c.hidden?c:$('modalBtn')).click()};
+ const nc=$('ncDlg');if(nc&&nc.style.display==='flex')return closeNewContract;
+ if(loadCount)return ()=>msg('처리 중입니다. 잠시만 기다려 주세요.');
+ if($('drawer')&&$('drawer').classList.contains('open'))return ()=>toggleMenu(false);
+ const ps=$('psheet');if(ps&&!ps.hidden&&ps.innerHTML)return ()=>{if(typeof pm==='undefined'||!pm){hideSheet();return}if(pm.mode==='edit'){cancelEditPermit();return}
+  if(pm.mode==='new'&&pmTouched&&!confirm('작성 중인 허가서를 닫을까요?\n입력한 내용은 저장되지 않습니다.'))return;if(pm.mode==='staff')backPermitList();else closePermit()};
+ const cs=$('csheet');if(cs&&cs.style.display==='block')return ()=>{if(/규정/.test(cs.getAttribute('aria-label')||'')){if(confirm('규정 작성을 닫을까요?\n입력한 내용은 저장되지 않습니다.'))closeRule()}else closePlan()};
+ const sec=document.querySelector('.main > section:not(.hidden)');if(sec){const b=[...sec.querySelectorAll('button')].find(x=>/^\s*←/.test(x.textContent)&&x.offsetParent!==null);if(b)return ()=>b.click()}
+ if(tab==='jobs'&&jobsMode==='form')return ()=>renderJobs();
+ if(state&&isVendorApproved()&&(tab!=='my'||vmenu!=='dash'||!$('execArea')))return ()=>vgo('dash');
+ if(state&&isStaffUI()&&(smenu!=='dash'||tab!=='jobs'))return ()=>sgo('dash');
+ return null}
+function goBack(){const f=backAction();if(f)f();updBack()}
+let backT=0;function updBack(){clearTimeout(backT);backT=setTimeout(()=>{const b=$('backBtn');if(b)b.hidden=!backAction()},60)}
+let navGuard=false,exitAt=0;
+function navInit(){if(navGuard)return;navGuard=true;try{history.replaceState({dsr:1},'');history.pushState({dsg:1},'')}catch(e){}
+ const m=document.querySelector('.main');if(m&&window.MutationObserver)new MutationObserver(updBack).observe(m,{childList:true,subtree:true});
+ document.addEventListener('click',updBack,true);updBack()}
+window.addEventListener('popstate',e=>{if(!navGuard||(e.state&&e.state.dsg))return;const f=backAction();
+ if(f){f();try{history.pushState({dsg:1},'')}catch(x){}updBack();return}
+ if(Date.now()-exitAt<2500){navGuard=false;history.back();return}
+ exitAt=Date.now();msg('뒤로 버튼을 한 번 더 누르면 나갑니다.');try{history.pushState({dsg:1},'')}catch(x){}});
 function initLogin(){
  // 접속 구분: 마지막 선택 기억
  const radios=[...document.querySelectorAll('input[name=loginMode]')];
