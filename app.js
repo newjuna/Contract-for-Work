@@ -36,7 +36,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.21 v5.9';
+const UI_VERSION='26.10.22 v5.10';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -174,7 +174,7 @@ const noBadge=o=>JSON.stringify(Object.assign({},o,{badges:null}));
 async function bootPortal(){const c=cacheGet('portalData',[]);
  if(!c){let s;loadStart('portalData');try{s=await api('portalData',[])}catch(e){msg(e.message||'불러오지 못했습니다.');throw e}finally{loadEnd()}setCUser(s.email+'|'+(s.mode||''));cacheSet('portalData',[],s);display(s);return}
  display(c);callQuiet('portalData').then(s=>{if(!c.email||s.email!==c.email){setCUser(s.email+'|'+(s.mode||''));display(s);return}
-  if(noBadge(s)===noBadge(c)){state.badges=s.badges;showBadges(s.badges);return}if(busyView()){state=s;showBadges(s.badges)}else display(s)}).catch(()=>{})}
+  if(noBadge(s)===noBadge(c)){state.badges=s.badges;showBadges(s.badges);return}if(busyView()){state=s;showBadges(s.badges)}else display(s)}).catch(e=>{popup('서버와 연결되지 않았습니다','지금 화면은 이 기기에 저장해 둔 이전 화면입니다.\n저장·제출이 되지 않을 수 있습니다.\n\n'+(e&&e.message||''),'확인')})}
 /* ---------- v2.9 공사·현장미팅 (직원) ---------- */
 let jobData=null,roomTimer=null,roomId='';
 /* v4.2 빠른 화면 전환: 한 번 본 화면은 저장해 둔 내용을 바로 보여 주고, 최신 내용은 뒤에서 조용히 받아 바꿈 */
@@ -386,7 +386,16 @@ window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.return
 const CONF=window.APP_CONFIG||{};
 const EXEC_OK=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(CONF.APPS_SCRIPT_URL||'');
 /** Apps Script로 요청 보내기 (text/plain = 브라우저 사전확인 없이 전송되는 방식) */
-async function post_(body){if(!EXEC_OK)throw Error('config.js에 Apps Script 주소(/exec)가 등록되지 않았습니다.');let o;try{const r=await fetch(CONF.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body)});o=await r.json()}catch(e){throw Error('서버에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.')}if(!o||!o.ok)throw Error((o&&o.error)||'처리에 실패했습니다.');return o.data}
+/* v5.10 서버는 처리를 끝냈는데 응답이 중간에 사라지는 경우(구글 응답 전달 오류: 404·CORS)가 있음
+ *  → 다시 해도 결과가 같은 요청(조회·임시저장·로그인)은 자동으로 2번까지 다시 보냄
+ *  → 제출·발행·승인처럼 두 번 하면 안 되는 요청은 다시 보내지 않고 안내만 */
+const RETRY_OK=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard','meetingDetail','permitList','permitDetail','getPermit','inspList','inspMine','jobEvalList','noticeList','vendorList','staffList','templateAdminList','reviewList','applications','getReviewData','getMeetingPhoto','getInspPhoto','myBadges','saveStep','getMyFile','getInternalFile','getTemplate','jobEvalFile']);
+async function post_(body){if(!EXEC_OK)throw Error('config.js에 Apps Script 주소(/exec)가 등록되지 않았습니다.');
+ const again=body.op==='login'||RETRY_OK.has(body.fn);let o,last;
+ for(let i=0;i<(again?3:1);i++){if(i)await new Promise(r=>setTimeout(r,800*i));
+  try{const r=await fetch(CONF.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),cache:'no-store'});o=await r.json();last=null;break}catch(e){last=e}}
+ if(last)throw Error(again?'서버 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.':'서버 응답을 받지 못했습니다. 처리가 되었을 수 있으니, 화면을 새로 고쳐 결과를 먼저 확인한 뒤 다시 시도해 주세요.');
+ if(!o||!o.ok)throw Error((o&&o.error)||'처리에 실패했습니다.');return o.data}
 /** 로그인 후 서버 기능 호출 (이름은 Code.gs 허용 목록에 있어야 함) */
 async function api(fn,args){try{return await post_({op:'call',fn,key:SESSION,args:args||[]})}catch(e){if(/로그인이 만료|로그인 정보/.test(e.message))setTimeout(()=>logout('로그인이 만료되었습니다. 다시 로그인해 주세요.'),0);throw e}}
 const LOGIN_HELP={VENDOR:'처음 방문한 업체는 로그인 후 사업자 등록을 신청합니다.',STAFF:'회사직원명단에 등록된 개인 Google 계정(Gmail)으로 로그인해 주세요.'};
