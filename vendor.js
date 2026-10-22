@@ -91,4 +91,7 @@ function closeNewContract(){const el=$('ncDlg');if(el)el.style.display='none'}
 async function doNewContract(mode){closeNewContract();
  if(mode==='NEW'&&!confirm('빈칸으로 새로 작성할까요?\n사업자·사업장 정보와 규정·계획서를 처음부터 다시 입력합니다.'))return;
  if(mode==='NEW'){try{localStorage.removeItem(plKey())}catch(e){}}  // 계획서 임시 저장본도 비움
- try{vmenu='docs';display(await call('startRenewal',mode));window.scrollTo(0,0);msg(mode==='NEW'?'신규 작성을 시작했습니다. 빈칸을 채워 제출해 주세요.':'이전 정보를 불러왔습니다. 바뀐 곳만 고쳐서 제출해 주세요.')}catch(e){}}
+ const done=s=>{vmenu='docs';display(s);window.scrollTo(0,0);msg(s.company&&s.company.renewMode==='NEW'?'신규 작성을 시작했습니다. 빈칸을 채워 제출해 주세요.':'이전 정보를 불러왔습니다. 바뀐 곳만 고쳐서 제출해 주세요.')};
+ try{done(await call('startRenewal',mode))}catch(e){
+  // 응답만 사라지고 서버는 처리했을 수 있음 → 현재 상태를 다시 받아 시작됐으면 그대로 진행
+  try{const s=await callQuiet('portalData');if(s.company&&s.company.renewAt){done(s);return}}catch(x){}}}
