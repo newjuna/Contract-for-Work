@@ -69,8 +69,7 @@ function renderEvalDone(e){const d=evData,au=e.auto.items||{};jobsMode='eval';ev
   +'<div class="card"><table class="rtable"><tr><th style="width:36px">No</th><th>항목</th><th style="width:60px">결과</th><th style="width:56px">점수</th></tr>'+d.evalItems.map(([no,,name])=>{const x=e.items[no]||{},P=d.points[no];return '<tr><td style="text-align:center">'+no+'</td><td><b>'+escapeText(name)+'</b><div class="muted">'+escapeText((au[no]||{}).why||'')+(x.memo?'<br>의견: '+escapeText(x.memo):'')+'</div></td><td style="text-align:center"'+(x.lv==='P'?' class="req"':'')+'>'+escapeText(EV_LV[x.lv]||'-')+'</td><td style="text-align:center">'+(x.lv?P['GNP'.indexOf(x.lv)]:0)+'/'+P[0]+'</td></tr>'}).join('')+'</table>'
   +'<div class="stage">개선사항</div><p class="desc" style="white-space:pre-line">'+escapeText(e.comment||'없음')+'</p></div>'
   +'<div class="card"><button class="button ghost" type="button" style="width:100%" onclick="reopenEval(\''+escapeText(e.id)+'\')">다시 수정</button></div>';window.scrollTo(0,0)}
-async function evFile(id,kind){const w=window.open('','_blank');if(w)w.document.write('<p style="font:16px sans-serif;margin:30px">파일을 준비하는 중입니다… (처음 한 번은 20초 정도)</p>');
- try{const r=await call('jobEvalFile',id,kind);if(r.data){if(w)w.close();saveBlob(r);return}if(w)w.location.href=r.url;else popup('파일 준비 완료','아래 버튼을 누르면 Google Drive에서 내려받습니다.\n('+r.name+')','내려받기',()=>window.open(r.url,'_blank'));msg('Google Drive에서 내려받습니다. 안 받아지면 Drive 로그인 계정을 확인해 주세요.')}catch(e){if(w)w.close()}}
+async function evFile(id,kind){try{saveBlob(await call('jobEvalFile',id,kind))}catch(e){}}
 async function reopenEval(id){if(!confirm('확정을 풀고 다시 수정할까요?\n수정 후 다시 [평가 확정]을 눌러야 합니다.'))return;try{evData=await call('reopenJobEval',id);openEval(id);refreshBadges()}catch(e){}}
 /* ---------- 업체 화면: 종료된 공사 ---------- */
 function vEndHtml(v){if(v.jobStatus!=='ENDED')return '';const r=v.evalResult;
