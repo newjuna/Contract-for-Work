@@ -8,11 +8,16 @@ const VMENU={dash:'대시보드',workers:'작업자 등록 · 오늘 인원',per
 /* v5.17 재평가 중(이전 승인 있음)이어도 수행 메뉴는 그대로 사용 */
 const isVendorApproved=()=>!!(state&&!state.staff&&state.company&&state.company.status==='VERIFIED'&&(state.company.submissionStatus==='APPROVED'||!!state.company.renewAt));
 /** 메뉴 버튼 보이기 (display 때마다) */
-function setupVMenu(){const ap=isVendorApproved();document.querySelectorAll('.vmb').forEach(b=>b.classList.toggle('hidden',!ap));
+/* v5.17 진행 중인 공사가 없으면(모두 종료 · 배정 전) 공사 업무 메뉴는 숨기고 대시보드·계약 서류만 */
+const VJOB_MENUS=['workers','permit','meet','insp','drill'];
+const vOpenJobs=()=>vjobs&&vjobs.jobs?vjobs.jobs.filter(j=>j.status!=='ENDED').length:(state&&state.openJobs!=null?state.openJobs:1);
+function setupVMenu(){const ap=isVendorApproved(),open=ap&&vOpenJobs()>0,isJob=el=>!!el&&VJOB_MENUS.includes(String(el.id).replace('vm_',''));
+ document.querySelectorAll('.vmb').forEach(b=>{const job=b.classList.contains('navh')?isJob(b.nextElementSibling):isJob(b);b.classList.toggle('hidden',!ap||(job&&!open))});
+ if(ap&&!open&&VJOB_MENUS.includes(vmenu)&&!vjob)vmenu='dash';  // 종료 공사 기록을 보고 있을 때는 그대로
  $('myTab').classList.toggle('hidden',ap);if(!state.staff&&state.company)$('myTab').textContent=ap?'내 업무':'계약 전 서류';if(ap)markVMenu()}
 function markVMenu(){document.querySelectorAll('.vmb').forEach(b=>b.classList.toggle('active',b.id==='vm_'+vmenu));if(tab==='my'&&isVendorApproved())$('pageTitle').textContent=VMENU[vmenu]}
 /** 메뉴 이동 */
-function vgo(m,id){vmenu=m;if(id)vSel=id;toggleMenu(false);stopScan();MEET_TOKEN='';if(tab!=='my')switchTab('my');markVMenu();clearInterval(wkTimer);showQr=false;showAdd=false;window.scrollTo(0,0);
+function vgo(m,id){if(!id&&VJOB_MENUS.includes(m)&&vOpenJobs()<1)m='dash';/* 진행 중 공사 없음 → 대시보드 (종료 공사 기록 보기는 id로 열림) */vmenu=m;if(id)vSel=id;toggleMenu(false);stopScan();MEET_TOKEN='';if(tab!=='my')switchTab('my');markVMenu();clearInterval(wkTimer);showQr=false;showAdd=false;window.scrollTo(0,0);
  if(!$('execArea')){renderMy();return}  // 참석 체크 화면 뒤에는 업체 화면을 다시 그림
  if(m==='meet'){renderVMeet();return}
  if(m==='dash'){vjob=null;loadMyJobs();return}if(m==='docs'){renderVDocs();return}if(m==='drill'){renderVDrill();return}vEnsureJob()}

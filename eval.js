@@ -73,7 +73,7 @@ async function evFile(id){try{saveBlob(await call('jobEvalFile',id));msg('전체
 async function reopenEval(id){if(!confirm('확정을 풀고 다시 수정할까요?\n수정 후 다시 [평가 확정]을 눌러야 합니다.'))return;try{evData=await call('reopenJobEval',id);openEval(id);refreshBadges()}catch(e){}}
 /* ---------- 업체 화면: 종료된 공사 ---------- */
 function vEndHtml(v){if(v.jobStatus!=='ENDED')return '';const r=v.evalResult;
- return '<div class="card alertcard"><h2>공사가 종료되었습니다</h2>'+(r?'<p class="desc">도급인 종료 평가 ('+escapeText(r.date)+'): <b>'+r.total+'점</b> '+gradePill(r.grade)+'</p>'+(r.comment?'<div class="stage">개선사항</div><p class="desc" style="white-space:pre-line">'+escapeText(r.comment)+'</p>':''):'<p class="desc">도급인 담당자가 종료 평가를 진행하고 있습니다.</p>')+'</div>'}
+ return '<div class="card alertcard"><h2>공사가 종료되었습니다</h2><p class="muted">지난 기록 보기 전용입니다. 작업자 등록·인원 체크·허가서 발행·순회점검 제출은 할 수 없습니다.</p>'+(r?'<p class="desc">도급인 종료 평가 ('+escapeText(r.date)+'): <b>'+r.total+'점</b> '+gradePill(r.grade)+'</p>'+(r.comment?'<div class="stage">개선사항</div><p class="desc" style="white-space:pre-line">'+escapeText(r.comment)+'</p>':''):'<p class="desc">도급인 담당자가 종료 평가를 진행하고 있습니다.</p>')+'</div>'}
 /* ---------- 안전보건팀: 참조 알림 ---------- */
 let noticeData=null;
 async function loadNotices(){if(!noticeData)noticeData=cacheGet('noticeList',[]);if(noticeData){seenTab.notice=1;renderNotices()}try{noticeData=await fetcher('notice')('noticeList');if(tab==='notice')renderNotices()}catch(e){}}
