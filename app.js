@@ -60,7 +60,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.23 v5.21';
+const UI_VERSION='26.10.23 v5.22';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -416,8 +416,8 @@ async function loadMyJobs(quick){const x=()=>$('execArea');if(!vjobs){const c=ca
  try{const r=await (had||/^MEET-/.test(LINK_REVIEW)?callQuiet:call)('myJobs');/* 참석 QR 화면 위에 로딩 창을 띄우지 않음 */vjobsAt=Date.now();vjobs=r;if(!had){setupVMenu();renderMyJobs()}else if(JSON.stringify(r)!==old){setupVMenu();if(vmenu==='dash'&&!vjob)renderDash()}}catch(e){if(!had&&x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
 function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
 async function openVJob(id){const c=cacheGet('vendorJob',[id]);vtab='today';showQr=false;showAdd=false;
- if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
- try{vjob=await call('vendorJob',id);renderVJob();window.scrollTo(0,0)}catch(e){}}
+ if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vSel!==id||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
+ try{const started=Date.now();vjob=await call('vendorJob',id);const received=Date.now();renderVJob();window.scrollTo(0,0);perfRecord('ui','vendorJobRender',Date.now()-received,true);perfRecord('flow','vendorJobTotal',Date.now()-started,true)}catch(e){const el=$('execArea');if(el)el.innerHTML='<div class="card"><h2>공사 화면을 열지 못했습니다</h2><p class="desc">'+escapeText(e.message||'통신 오류가 발생했습니다.')+'</p><button class="button" type="button" onclick="openVJob(vSel)">다시 시도</button></div>';}}
 function backJobs(){vgo('dash')}
 function setVTab(t){vtab=t;renderVJob()}
 function renderVJob(){const el=$('execArea');if(!el||!vjob)return;const v=vjob;clearInterval(wkTimer);
@@ -510,9 +510,9 @@ const EXEC_OK=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/
 const RETRY_OK=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard','meetingDetail','permitList','permitDetail','getPermit','inspList','inspMine','jobEvalList','noticeList','vendorList','staffList','templateAdminList','reviewList','applications','getReviewData','getMeetingPhoto','getInspPhoto','myBadges','saveStep','getMyFile','getInternalFile','getTemplate','saveMeetingDocs',/* v5.19 jobEvalFile은 다시 보내면 ZIP을 처음부터 또 만들어서 뺌 */'setMeetingOpen','confirmAttendee','checkInspections','readNotices','approvePermits','jobEvalList','startRenewal']);
 async function post_(body){const __pt=Date.now(),__name=body.op==='call'?String(body.fn||'call'):String(body.op||'request');let __ok=false;try{if(!EXEC_OK)throw Error('config.js에 Apps Script 주소(/exec)가 등록되지 않았습니다.');
  const again=body.op==='login'||RETRY_OK.has(body.fn);let o,last;
- for(let i=0;i<(again?3:1);i++){if(i)await new Promise(r=>setTimeout(r,800*i));
+ for(let i=0;i<(again?2:1);i++){if(i)await new Promise(r=>setTimeout(r,800*i));
   /* v5.20 다시 보내도 되는 요청은 45초 넘게 응답이 없으면 끊고 다시 보냄 (응답이 중간에 사라져 끝없이 기다리던 경우) */
-  const ac=again&&window.AbortController?new AbortController():null,tt=ac?setTimeout(()=>ac.abort(),45000):0;
+  const ac=again&&window.AbortController?new AbortController():null,tt=ac?setTimeout(()=>ac.abort(),35000):0;
   try{const r=await fetch(CONF.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),cache:'no-store',signal:ac?ac.signal:undefined});o=await r.json();last=null;break}catch(e){last=e}finally{clearTimeout(tt)}}
  if(!last&&o&&o.ok&&body.op==='call')sessTouch();  // v5.18 쓰는 동안은 이 기기 로그인 유지
  if(last)throw Error(again?'서버 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.':'서버 응답을 받지 못했습니다. 처리가 되었을 수 있으니, 화면을 새로 고쳐 결과를 먼저 확인한 뒤 다시 시도해 주세요.');
