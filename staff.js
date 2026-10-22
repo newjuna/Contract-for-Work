@@ -38,7 +38,7 @@ function sDash(d){const t=kstToday(),safety=d.me.role==='SAFETY',act=sAct(d),end
  let h='<div class="card"><h2 style="margin:0">'+escapeText(d.me.name)+' 님</h2><div class="muted">'+escapeText(t)+' · '+(safety?'전체 공사':'내 공사')+' 진행 '+act.length+'건'+(ended.length?' · 종료 '+ended.length+'건':'')+'</div></div>'
   +'<div class="card"><h2>오늘 처리할 일</h2>'+(todo||'<div class="note">✔ 처리할 일이 없습니다.</div>')+'</div>';
  if(!d.jobs.length)return h+sNone('등록된 공사가 없습니다. ☰ → 공사 관리에서 [+ 새 공사 만들기]로 시작하세요.');
- h+='<div class="card"><h2>공사 일정</h2>'+act.concat(ended.slice(0,5)).map(j=>ganttRow(j,t)).join('')+'</div>';
+ h+='<div class="card"><h2>공사 일정</h2>'+act.concat(ended.slice(0,5)).map(j=>ganttRow(j,t,true)).join('')+'</div>';
  if(act.length&&act.length<=3)h+=act.map(j=>{const R=sRates(j);return '<div class="card"><h2 style="margin:0">'+escapeText(j.title)+'</h2><div class="muted">'+sMeta(j)+' · 업체 '+j.vendors.length+'곳</div><div class="dns">'+donut(R.insp,'순회점검',R.inspTxt)+donut(R.permit,'작업허가서',R.permitTxt)+donut(R.crew,'인원·수칙',R.crewTxt)+'</div><p class="muted" style="text-align:center;margin:4px 0 0">참여 업체 합계 · 작업일 기준</p>'+sVendorRows(j)+'</div>'}).join('');
  else if(act.length)h+='<div class="card"><h2>공사별 이행률</h2><table class="rtable"><tr><th>공사</th><th>순회</th><th>허가서</th><th>인원</th><th>미조치</th></tr>'+act.map(j=>{const R=sRates(j);return '<tr><td><b>'+escapeText(j.title)+'</b><div class="muted">'+escapeText(j.storeName)+'</div></td><td'+(R.insp!=null&&R.insp<0.6?' class="req"':'')+'>'+pctTxt(R.insp)+'</td><td>'+pctTxt(R.permit)+'</td><td>'+pctTxt(R.crew)+'</td><td'+(j.findOpen?' class="req"':'')+'>'+(j.findOpen||0)+'</td></tr>'}).join('')+'</table></div>';
  if(safety)h+=sWatch(d);return h}
