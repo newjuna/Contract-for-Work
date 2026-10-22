@@ -44,7 +44,7 @@ function todoRows(j,t){const S=j.stats||{},inRange=j.startDate<=t&&(!j.endDate||
  if(S.openFindings)list.push(['insp','미조치 지적사항',S.openFindings+'건']);
  if(!list.length)return '<div class="note" style="margin-top:12px">✔ 오늘 할 일을 모두 마쳤습니다.</div>';
  return '<div class="stage">오늘 할 일</div>'+list.map(([m,txt,tag])=>'<button class="vtodo" type="button" onclick="vgo(\''+m+'\',\''+id+'\')"><span>'+escapeText(txt)+'</span><span class="req">'+escapeText(tag)+' ›</span></button>').join('')}
-function renderDash(){const el=$('execArea');if(!el||!vjobs)return;vjob=null;clearInterval(wkTimer);const d=vjobs,t=d.today,act=d.jobs.filter(j=>j.status!=='ENDED'),ended=d.jobs.filter(j=>j.status==='ENDED');
+function renderDash(){const el=$('execArea');if(!el||!vjobs)return;clearTimeout(window.__pf);window.__pf=setTimeout(()=>vjobs.jobs.filter(j=>j.status!=='ENDED').slice(0,3).forEach((j,i)=>setTimeout(()=>callQuiet('vendorJob',j.id).catch(()=>{}),i*400)),800);vjob=null;clearInterval(wkTimer);const d=vjobs,t=d.today,act=d.jobs.filter(j=>j.status!=='ENDED'),ended=d.jobs.filter(j=>j.status==='ENDED');
  const due=act.reduce((n,j)=>n+((j.stats&&j.stats.inspDue&&!j.stats.inspToday&&j.startDate<=t)?1:0)+((j.stats&&j.stats.openFindings)||0),0);setBadge($('vm_insp'),due);setBadge($('menuBtn'),due);
  el.innerHTML='<div class="card"><h2 style="margin:0">'+escapeText(d.company)+'</h2><div class="muted">'+escapeText(t)+' · 진행 중 공사 '+act.length+'건'+(ended.length?' · 종료 '+ended.length+'건':'')+'</div></div>'
   +(d.jobs.length?'<div class="card"><h2>공사 일정</h2>'+act.concat(ended).map(j=>ganttRow(j,t)).join('')+'</div>'

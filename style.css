@@ -191,3 +191,10 @@ body{background:var(--bg);color:var(--text);font:15px/1.6 "Pretendard","Malgun G
 .drawer .tabs button.smb{min-height:46px}
 .svitem{border-top:1px solid var(--line);padding:10px 0}.svitem:first-child{border-top:0}.svitem summary{cursor:pointer;list-style:none}.svitem summary::-webkit-details-marker{display:none}
 .svitem[open] summary{margin-bottom:4px}.svitem .rtable th{width:96px}
+
+/* ===== v5.8 조회 중 위쪽 얇은 진행선 (화면은 그대로 사용 가능) ===== */
+#topLoad{position:fixed;top:0;left:0;right:0;height:3px;z-index:80;pointer-events:none;opacity:0;transition:opacity .2s;overflow:hidden}
+#topLoad.on{opacity:1}#topLoad::before{content:'';position:absolute;top:0;bottom:0;width:40%;background:var(--accent,#d7262e);animation:topload 1s ease-in-out infinite}
+@keyframes topload{0%{left:-40%}100%{left:100%}}
+#topNote{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:80;background:#111827e6;color:#fff;font-size:13px;padding:7px 14px;border-radius:999px;pointer-events:none;opacity:0;transition:opacity .2s}
+#topNote.on{opacity:1}
