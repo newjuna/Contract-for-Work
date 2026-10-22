@@ -14,7 +14,7 @@ function setupSMenu(){const on=isStaffUI(),safety=on&&state.staff.role==='SAFETY
  markSMenu();if(tab==='my'&&!/^MEET-/.test(LINK_REVIEW))setTimeout(()=>sgo(smenu),0)}
 function markSMenu(){if(!isStaffUI())return;document.querySelectorAll('.smb').forEach(b=>b.classList.toggle('active',b.id==='sm_'+smenu));$('pageTitle').textContent=SMENU[smenu]||''}
 /** 메뉴 이동 */
-function sgo(m){smenu=m;toggleMenu(false);stopScan();
+function sgo(m){smenu=m;if(m==='dash'&&typeof dashJob!=='undefined')dashJob='';toggleMenu(false);stopScan();
  if(['notice','tpl','staff','vendors'].includes(m)){switchTab(m);markSMenu();return}
  if(tab!=='jobs')switchTab('jobs');else loadJobs();markSMenu();window.scrollTo(0,0)}
 /** 알림 숫자 (showBadges에서 호출) */
