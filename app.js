@@ -1,7 +1,14 @@
 /* 도급 안전관리 화면 (GitHub). 서버 기능은 Apps Script Code.gs */
 // v4.0 세션 값: 로그인 후 브라우저 탭 저장소(sessionStorage)에 보관 · 링크값: 주소창 ?review= (영문·숫자·- 만)
 (function(){const q=new URLSearchParams(location.search),u=(window.APP_CONFIG||{}).APPS_SCRIPT_URL||'';for(const k of ['eval','approve']){const t=(q.get(k)||'').toLowerCase();if(/^[a-f0-9]{64}$/.test(t)&&/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(u)){document.documentElement.innerHTML='<p style="font:16px sans-serif;margin:40px">검토 화면을 여는 중입니다…</p>';location.replace(u+'?'+k+'='+t);throw Error('redirect')}}})();
-let SESSION='';try{SESSION=sessionStorage.getItem('dsk')||''}catch(e){}
+/* v5.18 휴대폰: 탭 저장소(sessionStorage)는 카메라·사진 선택으로 앱을 오가거나 QR로 새 탭이 열리면 사라짐
+ *  → 이 기기에 저장(localStorage). 12시간 안 쓰면 버림 · 서버는 마지막 사용 후 6시간까지 유지 */
+const SESS_KEY='dsk2',SESS_MAX=12*3600e3;
+let SESSION='';try{const s=JSON.parse(localStorage.getItem(SESS_KEY)||'null');if(s&&s.k&&Date.now()-Number(s.t||0)<SESS_MAX)SESSION=s.k;else localStorage.removeItem(SESS_KEY)}catch(e){}
+if(!SESSION)try{SESSION=sessionStorage.getItem('dsk')||''}catch(e){}
+function sessSave(k){try{localStorage.setItem(SESS_KEY,JSON.stringify({k,t:Date.now()}))}catch(e){}try{sessionStorage.setItem('dsk',k)}catch(e){}}
+function sessTouch(){try{const s=JSON.parse(localStorage.getItem(SESS_KEY)||'null');if(s&&s.k===SESSION&&Date.now()-Number(s.t||0)>600000){s.t=Date.now();localStorage.setItem(SESS_KEY,JSON.stringify(s))}}catch(e){}}
+function sessClear(){try{localStorage.removeItem(SESS_KEY)}catch(e){}try{sessionStorage.removeItem('dsk')}catch(e){}}
 const LINK_REVIEW=(new URLSearchParams(location.search).get('review')||'').replace(/[^A-Za-z0-9-]/g,'').slice(0,40);
 let state=null,activeStep=1,saveTimer=null,dirty=false,tab='my',reviewing=null;
 const $=id=>document.getElementById(id),escapeText=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -36,7 +43,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.22 v5.17';
+const UI_VERSION='26.10.22 v5.18';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -328,13 +335,14 @@ function showCheckIn(r){const head='<div class="card"><small class="muted">'+esc
  if(r.state==='DONE')body=r.status==='PENDING'?'<div class="note"><b>확인 대기</b> · '+escapeText(r.name)+' ('+escapeText(r.company)+' · '+escapeText(r.role)+')<br>도급인 담당자가 현장에서 신원을 확인하면 참석으로 처리됩니다.</div>':'<div style="text-align:center;padding:10px 0"><div style="font-size:44px">✔</div><h2 style="color:#1b7442">참석 체크 완료</h2><p class="desc"><b>'+escapeText(r.name)+'</b> · '+escapeText(r.company)+' · '+escapeText(r.role)+'<br>'+escapeText(fmtTime(r.checkedAt))+' · 계정 '+escapeText(state.email)+'</p></div>';
  else if(r.state==='NO_VENDOR')body='<div class="note"><b>이 공사에 배정된 협력업체가 없습니다.</b><br>도급인 담당자가 [공사·현장미팅] → 공사 [수정]에서 참여 업체를 먼저 배정해야 합니다.</div><button class="button ghost" type="button" onclick="meetCheckIn()">다시 확인</button>';
  else if(r.state==='CLOSED')body='<div class="note">아직 방이 열리지 않았거나 이미 닫혔습니다. 도급인 담당자가 [방 열기]를 누른 뒤 다시 QR을 찍어 주세요.</div><button class="button ghost" type="button" onclick="meetCheckIn()">다시 확인</button>';
- else{const k=r.known;body='<p class="desc">로그인 계정 <b>'+escapeText(state.email)+'</b> 으로 참석을 기록합니다. 본인 계정이 맞는지 확인해 주세요.</p><form onsubmit="sendCheckIn(event)">'+input('cName','이름',k?k.name:'','text',false,'예: 홍길동')+(k?'<div class="field"><label>소속 업체</label><div><b>'+escapeText(k.company)+'</b> <span class="muted">(업체 가입 정보로 자동 확인)</span></div></div>':'<div class="field"><label for="f_cCompany">소속 업체</label><select id="f_cCompany"><option value="">업체 선택</option>'+r.vendors.map(v=>'<option value="'+escapeText(v.companyId)+'" '+(r.vendors.length===1?'selected':'')+'>'+escapeText(v.company)+'</option>').join('')+'</select><div class="muted">'+(r.myCompany?'<b class="req">이 계정의 업체('+escapeText(r.myCompany)+')는 이 공사에 배정되어 있지 않습니다.</b> 도급인에게 배정을 요청하거나, 실제 소속 업체를 고르세요.<br>':'이 계정은 업체 대표 계정으로 등록되어 있지 않습니다. ')+'소속 업체를 고르면 도급인 확인 후 참석 처리됩니다.</div></div>')+'<div class="field"><label for="f_cRole">역할</label><select id="f_cRole">'+r.roles.map(x=>'<option>'+escapeText(x)+'</option>').join('')+'</select></div><button class="button" style="width:100%" type="submit">참석 체크</button></form>'}
+ else{const k=r.known;body='<p class="desc">로그인 계정 <b>'+escapeText(state.email)+'</b> 으로 참석을 기록합니다. 본인 계정이 맞는지 확인해 주세요. <button class="linkbtn" type="button" onclick="relogin()">다른 계정으로 로그인</button></p><form onsubmit="sendCheckIn(event)">'+input('cName','이름',k?k.name:'','text',false,'예: 홍길동')+(k?'<div class="field"><label>소속 업체</label><div><b>'+escapeText(k.company)+'</b> <span class="muted">(업체 가입 정보로 자동 확인)</span></div></div>':'<div class="field"><label for="f_cCompany">소속 업체</label><select id="f_cCompany"><option value="">업체 선택</option>'+r.vendors.map(v=>'<option value="'+escapeText(v.companyId)+'" '+(r.vendors.length===1?'selected':'')+'>'+escapeText(v.company)+'</option>').join('')+'</select><div class="muted">'+(r.myCompany?'<b class="req">이 계정의 업체('+escapeText(r.myCompany)+')는 이 공사에 배정되어 있지 않습니다.</b> 도급인에게 배정을 요청하거나, 실제 소속 업체를 고르세요.<br>':'이 계정은 업체 대표 계정으로 등록되어 있지 않습니다. ')+'소속 업체를 고르면 도급인 확인 후 참석 처리됩니다.</div></div>')+'<div class="field"><label for="f_cRole">역할</label><select id="f_cRole">'+r.roles.map(x=>'<option>'+escapeText(x)+'</option>').join('')+'</select></div><button class="button" style="width:100%" type="submit">참석 체크</button></form>'}
  $('my').innerHTML=head+body+'</div>'}
 async function sendCheckIn(e){e.preventDefault();const info={name:value('cName'),role:$('f_cRole').value,companyId:$('f_cCompany')?$('f_cCompany').value:''};if(!info.name){alert('이름을 입력해 주세요.');return}if($('f_cCompany')&&!info.companyId){alert('소속 업체를 목록에서 골라 주세요.');$('f_cCompany').focus();return}await meetCheckIn(info)}
 /* ---------- v3.1 수행단계 (업체): 내 공사 → [오늘 할 일] / [비상대응훈련] ---------- */
 let vjobs=null,vjob=null,vtab='today',wkTimer=null,showQr=false,showAdd=false,workerLinkMode=false;
 const SIGN_LABEL={SELF:'✔ 본인 계정 서명',MANAGER:'✔ 소장 확인'};
-async function loadMyJobs(){const x=()=>$('execArea');const c=!vjobs&&cacheGet('myJobs',[]);if(c){vjobs=c;setupVMenu();renderMyJobs()}try{vjobs=await (vjobs?callQuiet:call)('myJobs');setupVMenu();renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
+let vjobsAt=0;  // v5.18 공사 목록 받은 시각 (방금 받았으면 화면만 다시 그림)
+async function loadMyJobs(quick){const x=()=>$('execArea');if(quick&&vjobs&&Date.now()-vjobsAt<20000){setupVMenu();renderMyJobs();return}const c=!vjobs&&cacheGet('myJobs',[]);if(c){vjobs=c;setupVMenu();renderMyJobs()}try{vjobs=await (vjobs?callQuiet:call)('myJobs');vjobsAt=Date.now();setupVMenu();renderMyJobs()}catch(e){if(x())x().innerHTML='<div class="card"><p class="desc">'+escapeText(e.message||'공사 목록을 불러오지 못했습니다.')+'</p></div>'}}
 function renderMyJobs(){if(vmenu==='dash')renderDash();else vEnsureJob()}
 async function openVJob(id){const c=cacheGet('vendorJob',[id]);vtab='today';showQr=false;showAdd=false;
  if(c){vjob=c;renderVJob();window.scrollTo(0,0);callQuiet('vendorJob',id).then(x=>{if(!vjob||vjob.job.id!==id||JSON.stringify(x)===JSON.stringify(vjob))return;const typing=document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&$('execArea')?.contains(document.activeElement);vjob=x;if(!typing&&!document.querySelector('#psheet:not([hidden])'))renderVJob()}).catch(()=>{});return}
@@ -380,7 +388,7 @@ function showRules(date){const v=vjob,h=v.history.find(x=>x.date===date)||v.toda
 async function wkCheckIn(info){const token=LINK_REVIEW.slice(4);try{const r=await call('workerCheckIn',token,info||null);showWk(r)}catch(e){$('my').innerHTML='<div class="card"><h2>작업자 등록 실패</h2><p class="desc">'+escapeText(e.message||'')+'</p></div>'}$('pageTitle').textContent='작업자 등록';window.scrollTo(0,0)}
 function showWk(r){const head='<div class="card"><small class="muted">'+escapeText(r.store)+' · '+escapeText(r.company)+' ('+escapeText(r.trade)+')</small><h2>작업자 등록 · 신규자 교육</h2>';let body='';
  if(r.state==='DONE')body='<div style="text-align:center;padding:10px 0"><div style="font-size:44px;color:var(--ok)">✔</div><h2 style="color:var(--ok)">'+(r.again?'이미 등록되어 있습니다':'등록 완료')+'</h2><p class="desc"><b>'+escapeText(r.name)+'</b> · '+escapeText(r.role)+' · '+escapeText(r.company)+'<br>교육 확인 '+escapeText(fmtTime(r.eduAt))+' · 계정 '+escapeText(state.email)+'</p><div class="note" style="text-align:left">이 공사에서는 다시 QR을 찍지 않아도 됩니다.<br>내일부터는 소장님이 출근 인원을 체크합니다.</div></div>';
- else body='<p class="desc">로그인 계정 <b>'+escapeText(state.email)+'</b> 으로 등록합니다. <b>본인 계정</b>인지 확인해 주세요. 이 공사에서 처음 한 번만 하면 됩니다.</p><form onsubmit="sendWk(event)">'+input('kName','이름','','text',false,'예: 홍길동')+'<div class="split"><div class="field"><label for="f_kRole">구분</label><select id="f_kRole">'+r.roles.map(x=>'<option '+(x==='근로자'?'selected':'')+'>'+escapeText(x)+'</option>').join('')+'</select></div>'+input('kTrade','공정명 (선택)','','text',false,'예: 목공, 전기')+'</div>'
+ else body='<p class="desc">로그인 계정 <b>'+escapeText(state.email)+'</b> 으로 등록합니다. <b>본인 계정</b>인지 확인해 주세요. 이 공사에서 처음 한 번만 하면 됩니다. <button class="linkbtn" type="button" onclick="relogin()">다른 계정으로 로그인</button></p><form onsubmit="sendWk(event)">'+input('kName','이름','','text',false,'예: 홍길동')+'<div class="split"><div class="field"><label for="f_kRole">구분</label><select id="f_kRole">'+r.roles.map(x=>'<option '+(x==='근로자'?'selected':'')+'>'+escapeText(x)+'</option>').join('')+'</select></div>'+input('kTrade','공정명 (선택)','','text',false,'예: 목공, 전기')+'</div>'
   +'<div class="stage">작업 안전 수칙 (끝까지 읽어 주세요)</div><ol class="rules boxed">'+r.rules.map(x=>'<li>'+escapeText(x)+'</li>').join('')+'</ol><p class="pledge">'+escapeText(r.pledge)+'</p><label class="wk"><input type="checkbox" id="kAgree"><span>위 작업 안전 수칙을 교육받았고, 준수할 것을 서약합니다.</span></label><button class="button" style="width:100%;margin-top:10px" type="submit">교육 확인 및 서명</button></form>';
  $('my').innerHTML=head+body+'</div>'}
 async function sendWk(e){e.preventDefault();const info={name:value('kName'),role:$('f_kRole').value,trade:value('kTrade'),agree:$('kAgree').checked};if(!info.name){markMissing([{key:'kName'}]);return}if(!info.agree){alert('작업 안전 수칙 교육 확인·서약에 체크해 주세요.');return}await wkCheckIn(info)}
@@ -410,7 +418,7 @@ function localMissing(){const data=((state.steps||[]).find(x=>Number(x.step)===1
  if(!state.testSkipFiles)renewRows((state.docBoard&&state.docBoard.rows)||[]).filter(r=>r.stage==='CONTRACT'&&r.vendorDoc&&r.required&&!r.uploads.length).forEach(r=>m.push({key:'doc'+r.code}));return m}
 async function submitAll(){const miss=localMissing();if(miss.length){markMissing(miss);msg(/^doc/.test(miss[0].key)?'제출 서류를 먼저 작성해 주세요':'빨간 칸을 채워 주세요');return}
  if(!confirm('제출할까요?\n제출하면 검토가 끝날 때까지 수정할 수 없습니다.'))return;if(dirty&&!await save(false))return;
- try{const r=await call('submitProfile');if(r.ok){display(await call('portalData'));msg('제출했습니다. 본사 담당자가 검토합니다.')}else{markMissing(r.missing||[]);msg('빈 항목이 있습니다.')}}catch(e){}}
+ try{const r=await call('submitProfile');if(r.ok){display(r.portal||await call('portalData'));msg('제출했습니다. 본사 담당자가 검토합니다.')}/* v5.18 서버가 화면도 같이 줌 */else{markMissing(r.missing||[]);msg('빈 항목이 있습니다.')}}catch(e){}}
 async function loadAdmin(){try{const a=await fetcher('admin')('applications');$('admin').innerHTML=`<div class="card"><h2>사업자 등록 신청 관리</h2><p class="desc">업체가 본인을 승인 담당자로 지정한 신청이 표시됩니다(관리자는 전체). 승인하면 업체 화면이 바로 작성 단계로 넘어갑니다.</p>${a.map(b=>`<div class="item" id="biz-${escapeText(b.id)}"><b>${escapeText(b.company)}</b> <span class="badge">${escapeText(b.status)}</span> ${b.duplicate==='Y'?'<span class="badge">중복 검토</span>':''}${b.certMissing?'<span class="pill todo">등록증 미첨부(테스트)</span>':''}<div class="desc">${escapeText(b.industry)} / ${escapeText(b.regNo)}<br>대표자 ${escapeText(b.representative)} / 담당자 ${escapeText(b.contact)}<br>주소 ${escapeText(b.address)}<br>업체 계정 ${escapeText(b.email||'')} · 지정 승인 담당자 ${escapeText(b.approverEmail||'(지정 없음)')}</div>${b.status==='PENDING'?`<div class="row">${b.certMissing?'':`<button class="button ghost" onclick="registrationDocs('${escapeText(b.id)}')">사업자등록증 확인</button>`}<button class="button" onclick="decide('${escapeText(b.id)}','APPROVE')">승인</button><button class="button ghost" onclick="decide('${escapeText(b.id)}','REJECT')">반려</button></div>`:''}</div>`).join('')||'<p>신청 내역이 없습니다.</p>'}</div>`;if(LINK_REVIEW){setTimeout(()=>$('biz-'+LINK_REVIEW)?.scrollIntoView({block:'center'}),100)}}catch(e){}}
 async function decide(id,decision){const reason=decision==='REJECT'?prompt('반려 사유를 입력하세요.'):'';if(decision==='REJECT'&&reason===null)return;if(!confirm(decision==='APPROVE'?'해당 업체를 승인할까요?\n승인하면 업체는 바로 안전보건정보 작성을 시작할 수 있습니다.':'해당 업체를 반려할까요?'))return;try{await call('decideBusiness',id,decision,reason);msg('처리했습니다.');loadAdmin()}catch(e){}}
 async function resend(id){if(!confirm('새 인증번호를 보내겠습니까?'))return;try{await call('resendOtp',id);msg('재발송했습니다.');loadAdmin()}catch(e){}}
@@ -433,6 +441,7 @@ async function post_(body){if(!EXEC_OK)throw Error('config.js에 Apps Script 주
  const again=body.op==='login'||RETRY_OK.has(body.fn);let o,last;
  for(let i=0;i<(again?3:1);i++){if(i)await new Promise(r=>setTimeout(r,800*i));
   try{const r=await fetch(CONF.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),cache:'no-store'});o=await r.json();last=null;break}catch(e){last=e}}
+ if(!last&&o&&o.ok&&body.op==='call')sessTouch();  // v5.18 쓰는 동안은 이 기기 로그인 유지
  if(last)throw Error(again?'서버 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.':'서버 응답을 받지 못했습니다. 처리가 되었을 수 있으니, 화면을 새로 고쳐 결과를 먼저 확인한 뒤 다시 시도해 주세요.');
  if(!o||!o.ok)throw Error((o&&o.error)||'처리에 실패했습니다.');return o.data}
 /** 로그인 후 서버 기능 호출 (이름은 Code.gs 허용 목록에 있어야 함) */
@@ -444,18 +453,40 @@ function loginHelp(){$('loginHelp').textContent=isWorkerLink()?'소장님이 보
 function showLogin(note){$('appView').hidden=true;$('loginView').hidden=false;document.title='도급 안전관리 | 로그인';$('loginStatus').textContent=note||'';renderGoogleBtn()}
 function showApp(){$('loginView').hidden=true;$('appView').hidden=false;document.title='도급 안전관리'}
 let gsiDone=false;
-function renderGoogleBtn(){if(gsiDone)return;if(!window.google?.accounts?.id){setTimeout(renderGoogleBtn,300);return}gsiDone=true;google.accounts.id.initialize({client_id:CONF.CLIENT_ID,callback:onGoogleLogin,ux_mode:'popup'});google.accounts.id.renderButton($('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'})}
+let gsiWait=0;
+function renderGoogleBtn(){if(gsiDone)return;if(!window.google?.accounts?.id){gsiWait++;
+  /* v5.18 10초 넘게 구글 로그인 버튼을 못 받으면 안내 (회사 와이파이·느린 데이터·광고 차단) */
+  if(gsiWait===34&&!$('gsiSlow')){const p=document.createElement('p');p.id='gsiSlow';p.className='lstatus';p.innerHTML='구글 로그인 버튼을 불러오지 못하고 있습니다.<br>와이파이/데이터를 바꾸거나, 광고 차단을 끄거나, 크롬·사파리로 다시 열어 주세요. <button class="button ghost" type="button" style="margin-top:8px" onclick="location.reload()">다시 불러오기</button>';$('googleBtn').after(p)}
+  setTimeout(renderGoogleBtn,300);return}gsiDone=true;$('gsiSlow')?.remove();google.accounts.id.initialize({client_id:CONF.CLIENT_ID,callback:onGoogleLogin,ux_mode:'popup'});google.accounts.id.renderButton($('googleBtn'),{theme:'outline',size:'large',shape:'pill',width:300,text:'signin_with',locale:'ko'})}
 async function onGoogleLogin(r){if(!r||!r.credential)return;const st=$('loginStatus');st.textContent='인증 정보를 확인하고 있습니다...';
- try{const d=await post_({op:'login',credential:r.credential,mode:isWorkerLink()?'':loginMode()});SESSION=d.key;try{sessionStorage.setItem('dsk',SESSION)}catch(e){}try{const p=r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const j=JSON.parse(decodeURIComponent(escape(atob(p+'==='.slice((p.length+3)%4)))));setCUser(String(j.email||'').toLowerCase()+'|'+(isWorkerLink()?'':loginMode()))}catch(e){setCUser('')}st.textContent='';showApp();bootApp()}catch(e){st.textContent='로그인 실패: '+e.message}}
+ try{const d=await post_({op:'login',credential:r.credential,mode:isWorkerLink()?'':loginMode()});SESSION=d.key;sessSave(SESSION);try{const p=r.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');const j=JSON.parse(decodeURIComponent(escape(atob(p+'==='.slice((p.length+3)%4)))));setCUser(String(j.email||'').toLowerCase()+'|'+(isWorkerLink()?'':loginMode()))}catch(e){setCUser('')}st.textContent='';showApp();bootApp()}catch(e){st.textContent='로그인 실패: '+e.message}}
 /** 로그아웃: 저장된 로그인 정보 지우고 처음 화면으로 (주소창의 링크값도 정리) */
-function logout(note){cacheClear();try{localStorage.removeItem('fcUser')}catch(e){}try{sessionStorage.removeItem('dsk');if(note)sessionStorage.setItem('loginNote',note)}catch(e){}dirty=false;location.href=location.pathname}
+function logout(note){cacheClear();try{localStorage.removeItem('fcUser')}catch(e){}sessClear();try{if(note)sessionStorage.setItem('loginNote',note)}catch(e){}dirty=false;location.href=location.pathname}
+/** QR·링크 화면에서 다른 계정으로 (주소의 링크값은 그대로 두고 로그인만 다시) */
+function relogin(){cacheClear();try{localStorage.removeItem('fcUser')}catch(e){}sessClear();dirty=false;location.reload()}
+/* ---------- v5.18 휴대폰 로그인: 앱 안 화면 확인 ----------
+ *  카카오톡·네이버·밴드·인스타·페이스북·라인·회사 메일 앱 안에서 열린 화면은 구글이 로그인을 막음 (403 disallowed_useragent)
+ *  → 크롬·사파리로 열기 안내 (카카오톡은 바로 바깥 브라우저로 넘김, 안드로이드는 크롬으로 열기 버튼) */
+const UA=navigator.userAgent||'',IS_IOS=/iPhone|iPad|iPod/i.test(UA),IS_AND=/Android/i.test(UA);
+function inAppName(){if(/KAKAOTALK/i.test(UA))return '카카오톡';if(/NAVER\(inapp|NAVER/.test(UA)&&/inapp/i.test(UA))return '네이버';if(/BAND\//i.test(UA))return '밴드';if(/Instagram/i.test(UA))return '인스타그램';if(/FBAN|FBAV|FB_IAB/i.test(UA))return '페이스북';if(/Line\//i.test(UA))return '라인';if(/DaumApps|DaumDevice/i.test(UA))return '다음';
+ if(IS_AND&&/; wv\)/.test(UA))return '앱';if(IS_IOS&&!/Safari\//.test(UA))return '앱';return ''}
+function openOutside(){const u=location.href;
+ if(/KAKAOTALK/i.test(UA)){location.href='kakaotalk://web/openExternal?url='+encodeURIComponent(u);return}
+ if(IS_AND){location.href='intent://'+u.replace(/^https?:\/\//,'')+'#Intent;scheme=https;package=com.android.chrome;end';return}
+ copyLoginLink()}
+function copyLoginLink(){const u=location.href;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(()=>alert('주소를 복사했습니다.\nSafari(사파리)나 크롬을 열고 주소창에 붙여넣어 주세요.'),()=>prompt('아래 주소를 길게 눌러 복사한 뒤 Safari·크롬 주소창에 붙여넣어 주세요.',u))}
+function inAppBox(){const n=inAppName();if(!n)return;const box=document.createElement('div');box.className='note';box.id='inAppBox';box.style.cssText='margin:12px 0;border-left:3px solid var(--accent);text-align:left';
+ box.innerHTML='<b>'+escapeText(n)+' 안에서 열린 화면입니다</b><br>구글이 이 화면에서는 로그인을 막는 경우가 많습니다. <b>'+(IS_IOS?'Safari(사파리)':'크롬')+'</b>로 열어 주세요.'
+  +'<div style="display:grid;gap:8px;margin-top:10px"><button class="button" type="button" onclick="openOutside()">'+(IS_IOS&&!/KAKAOTALK/i.test(UA)?'주소 복사하기':(IS_IOS?'Safari':'크롬')+'로 열기')+'</button>'
+  +(IS_IOS&&!/KAKAOTALK/i.test(UA)?'<span class="muted">또는 오른쪽 위·아래의 ··· / 공유 버튼 → "Safari로 열기"</span>':'<button class="button ghost" type="button" onclick="copyLoginLink()">주소 복사하기</button>')+'</div>';
+ const g=$('googleBtn');g.parentNode.insertBefore(box,g)}
 function initLogin(){
  // 접속 구분: 마지막 선택 기억
  const radios=[...document.querySelectorAll('input[name=loginMode]')];
  try{const s=localStorage.getItem('loginMode');const r=radios.find(x=>x.value===s);if(r)r.checked=true}catch(e){}
  radios.forEach(x=>x.addEventListener('change',()=>{try{localStorage.setItem('loginMode',loginMode())}catch(e){}loginHelp()}));
  if(isWorkerLink()){$('modeBox').hidden=true;$('loginSub').textContent='작업자 등록 · 본인 Google 계정으로 로그인하세요.'}
- loginHelp();
+ loginHelp();inAppBox();
  // 버전 표시: 위쪽 UI_VERSION
  $('loginVer').textContent=UI_VERSION;
  let note='';try{note=sessionStorage.getItem('loginNote')||'';sessionStorage.removeItem('loginNote')}catch(e){}
