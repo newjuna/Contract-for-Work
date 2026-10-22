@@ -60,7 +60,7 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.23 v5.23';
+const UI_VERSION='26.10.23 v5.24';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
@@ -447,35 +447,56 @@ function toggleQr(){showQr=!showQr;renderVJob()}
 function toggleAdd(){showAdd=!showAdd;renderVJob();if(showAdd)setTimeout(()=>$('f_wName')?.focus(),50)}
 function checkAllCrew(){const l=[...document.querySelectorAll('.crewck')],all=l.every(x=>x.checked);l.forEach(x=>x.checked=!all)}
 async function renewQr(){if(!confirm('QR을 새로 만들면 이전 QR·링크는 더 이상 쓸 수 없습니다. 새로 만들까요?'))return;try{vjob=await call('renewWorkerQr',vjob.job.id);renderVJob();msg('새 QR을 만들었습니다.')}catch(e){}}
-/* v5.23: 모바일 통신 끊김으로 저장 성공을 실패로 오인하지 않도록 처리한다.
- * 제출마다 요청 ID 고정: 재시도되어도 서버에서 같은 사람을 다시 추가하지 않음. */
+/* v5.24: 서버 등록 성공 영수증을 받으면 즉시 화면에 반영.
+ * 전체 공사 조회는 백그라운드 수행해 느린 조회가 등록 확인을 가로막지 않게 한다. */
 let workerSubmitting=false,workerPending=null;
+function workerApplyReceipt(r,d){
+ if(!vjob||!r||!r.saved||!r.workerId||vjob.job.id!==r.jobId)return false;
+ const w={id:r.workerId,name:r.name||d.name,role:r.role||d.role,trade:r.trade||d.trade,method:'MANUAL',eduAt:new Date().toISOString(),email:''};
+ if(!vjob.workers.some(x=>x.id===w.id))vjob.workers.push(w);
+ if(vjob.todayCrew&&Array.isArray(vjob.todayCrew.workers)){
+  if(!vjob.todayCrew.workers.some(x=>x.id===w.id))vjob.todayCrew.workers.push({...w,sign:'MANAGER'});
+  vjob.todayCrew.count=vjob.todayCrew.workers.length;
+ }else{
+  vjob.todayCrew={date:r.date,count:1,workers:[{...w,sign:'MANAGER'}],siteManager:vjob.siteManager||'',savedAt:new Date().toISOString()};
+ }
+ return true;
+}
 async function addWorkerForm(e){
  e.preventDefault();if(workerSubmitting)return;
  const d={name:value('wName'),role:$('f_wRole').value,trade:value('wTrade'),agree:$('wAgree').checked};
  if(!d.name){markMissing([{key:'wName'}]);return}
- if(!d.agree){alert('교육 실시·서약 확인에 체크해 주세요.');return}
+ if(!d.agree){msg('교육 실시·서약 확인에 체크해 주세요.');return}
  const jobId=vjob.job.id,mark=[jobId,d.name,d.role,d.trade].join('|');
  if(!workerPending||workerPending.mark!==mark){
-   const id=(globalThis.crypto&&crypto.randomUUID?crypto.randomUUID().replace(/-/g,''):Array.from({length:32},()=>Math.floor(Math.random()*16).toString(16)).join(''));
-   workerPending={mark,id};
+  const id=(globalThis.crypto&&crypto.randomUUID?crypto.randomUUID().replace(/-/g,''):Array.from({length:32},()=>Math.floor(Math.random()*16).toString(16)).join(''));
+  workerPending={mark,id};
  }
  workerSubmitting=true;
- const submit=e.target,btn=submit?.querySelector('button[type=submit],button:not([type])');if(btn)btn.disabled=true;
+ const btn=e.target?.querySelector('button[type=submit]');if(btn){btn.disabled=true;btn.textContent='등록 처리 중…'}
  try{
-   vjob=await call('addWorker',jobId,d,workerPending.id);
-   workerPending=null;showAdd=false;renderVJob();msg(d.name+' 님을 등록했습니다. (오늘 인원에 포함)');
+  const r=await call('addWorker',jobId,d,workerPending.id);
+  if(!r?.saved||!r.workerId)throw Error('등록 결과를 확인할 수 없습니다.');
+  workerPending=null;
+  workerApplyReceipt(r,d);showAdd=false;renderVJob();
+  msg(d.name+' 님이 등록됐습니다.');
+  // 전체 자료 조회는 화면을 가리지 않으며 실패하더라도 방금 완료된 등록을 실패로 처리하지 않는다.
+  callQuiet('vendorJob',jobId).then(latest=>{
+   if(vjob&&vjob.job.id===jobId&&latest){vjob=latest;renderVJob()}
+  }).catch(()=>{});
  }catch(err){
-   /* 서버가 저장은 했지만 응답에 실패한 경우: 실제 명단을 다시 읽어 확인 */
-   msg('연결이 불안정해 등록 결과를 확인하고 있습니다. 다시 누르지 마세요.');
-   try{
-     const latest=await callQuiet('vendorJob',jobId);
-     if(latest){vjob=latest;const found=(latest.workers||[]).some(w=>w.id==='WK-'+workerPending.id.slice(0,16).toUpperCase());
-       if(found){workerPending=null;showAdd=false;renderVJob();msg(d.name+' 님이 정상 등록된 것을 확인했습니다.');return}
-     }
-     alert('등록 완료를 확인하지 못했습니다. 작업자 명단을 확인한 뒤 다시 시도해 주세요. 동일한 요청은 중복 등록되지 않습니다.');
-   }catch(checkErr){alert('서버 응답을 확인할 수 없습니다. 새로 등록하지 말고 먼저 작업자 명단에서 등록 여부를 확인해 주세요.')}
- }finally{workerSubmitting=false;if(btn&&btn.isConnected)btn.disabled=false}
+  // 네트워크 장애 시 이미 서버에 저장됐을 수 있다. 같은 요청 ID로만 다시 시도할 수 있게 유지.
+  msg('등록 결과를 확인하지 못했습니다. 같은 작업자를 다시 추가하기 전에 명단을 확인해 주세요.');
+  // 재확인은 화면을 막지 않음. 등록 ID가 확인될 때만 완료 처리.
+  const rid='WK-'+workerPending.id.slice(0,16).toUpperCase();
+  callQuiet('vendorJob',jobId).then(latest=>{
+   if(!latest||!vjob||vjob.job.id!==jobId)return;
+   vjob=latest;
+   if((latest.workers||[]).some(w=>w.id===rid)){
+    workerPending=null;showAdd=false;renderVJob();msg(d.name+' 님이 등록된 것을 확인했습니다.');
+   }
+  }).catch(()=>{});
+ }finally{workerSubmitting=false;if(btn&&btn.isConnected){btn.disabled=false;btn.textContent='작업자 등록'}}
 }
 async function dropWorker(id,name){if(!confirm(name+' 님을 작업자 명단에서 뺄까요? (지난 기록은 남습니다)'))return;try{vjob=await call('removeWorker',vjob.job.id,id);renderVJob()}catch(e){}}
 async function saveCrewForm(e){e.preventDefault();const ids=[...document.querySelectorAll('.crewck:checked')].map(x=>x.value),sm=value('crewSm');if(!sm){markMissing([{key:'crewSm'}]);return}if(!ids.length){alert('오늘 일하는 사람을 한 명 이상 체크해 주세요.');return}if(!confirm('오늘 작업 인원 '+ids.length+'명을 저장할까요?\n저장하면 오늘 작업 안전 수칙 서명으로 기록됩니다.'))return;try{vjob=await call('saveCrew',vjob.job.id,ids,sm);renderVJob();msg('오늘 작업 인원 '+ids.length+'명을 저장했습니다.');$('crewCard')?.scrollIntoView({block:'start'})}catch(err){}}
