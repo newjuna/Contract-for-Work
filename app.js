@@ -36,6 +36,22 @@ function setCUser(u){u=String(u||'');if(u===CUSER)return;cacheClear();CUSER=u;tr
 /* 로딩 창 규칙 (v5.9)
  *  - call      : 로딩 창 (0.4초 안에 끝나면 안 뜸) → 처음 여는 화면 · 저장 · 제출 · 발행 · 승인 · 파일 만들기
  *  - callQuiet : 로딩 창 없음 → 저장해 둔 화면을 먼저 보여 준 뒤 뒤에서 최신으로 바꿀 때 · 자동저장 · 알림 숫자 */
+
+/* v5.21 모바일 성능 진단: 민감정보 없이 API 이름·요청시간·성공 여부만 기기 내 보관 */
+const PERF_KEY='dsk_perf_521', PERF_CAP=80;
+function perfRead(){try{const x=JSON.parse(localStorage.getItem(PERF_KEY)||'[]');return Array.isArray(x)?x:[]}catch(e){return []}}
+function perfRecord(kind,name,ms,ok,detail){try{const all=perfRead();all.push({at:new Date().toLocaleString('ko-KR'),type:String(kind).slice(0,12),name:String(name||'').replace(/[^A-Za-z0-9_]/g,'').slice(0,40),ms:Math.max(0,Math.round(ms)),ok:!!ok,info:String(detail||'').replace(/[^A-Za-z0-9_]/g,'').slice(0,24)});localStorage.setItem(PERF_KEY,JSON.stringify(all.slice(-PERF_CAP)))}catch(e){}}
+function perfUI(){const allow=!!(state&&state.staff&&['SAFETY','ADMIN'].includes(state.staff.role))||!!(state&&state.isMaster);let b=$('perfBtn');if(!allow){if(b)b.remove();return}if(b)return;
+ b=document.createElement('button');b.id='perfBtn';b.type='button';b.textContent='⏱ 성능 진단 (최근 요청)';b.style.cssText='margin:4px 18px 8px;padding:10px;border:1px solid #d1d5db;border-radius:9px;background:#fff;color:#374151;text-align:left;cursor:pointer';b.onclick=perfOpen;
+ const anchor=document.querySelector('#drawer .logout');if(anchor)anchor.parentNode.insertBefore(b,anchor);
+}
+function perfOpen(){toggleMenu(false);let e=$('perfPanel');if(!e){e=document.createElement('div');e.id='perfPanel';e.setAttribute('role','dialog');e.setAttribute('aria-modal','true');e.style.cssText='position:fixed;inset:0;z-index:100;background:#fff;overflow:auto;padding:16px;max-width:720px;margin:0 auto';document.body.appendChild(e)}
+ const rows=perfRead().slice().reverse(),slow=rows.filter(x=>x.ms>=10000).length;
+ e.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2>모바일 성능 진단</h2><button type="button" class="button ghost" id="perfClose">닫기</button></div><p class="muted">이 기기에서 최근 실행한 요청만 기록합니다. 계정·토큰·URL·업무내용은 저장하지 않습니다. 10초 이상 '+slow+'건 / 총 '+rows.length+'건</p><div class="row"><button type="button" class="button ghost" id="perfCopy">결과 복사</button><button type="button" class="button ghost" id="perfClear">기록 삭제</button></div><div style="overflow:auto;margin-top:15px"><table class="rtable"><thead><tr><th>시각</th><th>요청</th><th>초</th><th>결과</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+escapeText(x.at)+'</td><td>'+escapeText(x.name)+'</td><td style="text-align:right">'+(x.ms/1000).toFixed(1)+'</td><td>'+(x.ok?'완료':'실패')+'</td></tr>').join('')+'</tbody></table></div>';
+ $('perfClose').onclick=()=>e.remove();$('perfClear').onclick=()=>{if(confirm('이 기기의 진단 기록을 삭제할까요?')){localStorage.removeItem(PERF_KEY);perfOpen()}};
+ $('perfCopy').onclick=()=>{const txt='도급관리 '+UI_VERSION+'\n'+rows.map(x=>x.at+' | '+x.name+' | '+(x.ms/1000).toFixed(1)+'초 | '+(x.ok?'완료':'실패')).join('\n');if(navigator.clipboard?.writeText)navigator.clipboard.writeText(txt).then(()=>msg('진단 결과를 복사했습니다.')).catch(()=>msg('복사가 차단되었습니다. 표를 캡처해 주세요.'));else msg('표를 캡처해 주세요.')};
+}
+
 function call(name,...args){loadStart(name);return api(name,args).then(r=>{loadEnd();cacheSet(name,args,r);return r},e=>{loadEnd();msg(e.message||'처리에 실패했습니다.');throw e})}
 /** 화면을 가리지 않는 조용한 호출 (자동저장용) */
 function callQuiet(name,...args){return api(name,args).then(r=>{cacheSet(name,args,r);return r})}
@@ -44,11 +60,11 @@ function text(id,label,value='',disabled=false){return `<div class="field"><labe
 function value(id){return $('f_'+id)?.value?.trim()||''}
 function switchTab(which){tab=which;toggleMenu(false);stopScan();if($(which+'Tab'))$('pageTitle').textContent=$(which+'Tab').textContent;clearInterval(roomTimer);clearInterval(wkTimer);for(const n of ['my','admin','review','tpl','staff','jobs','notice','vendors']){$(n).classList.toggle('hidden',n!==which);$(n+'Tab').classList.toggle('active',n===which)}if(which==='admin')loadAdmin();if(which==='review')loadReview();if(which==='tpl')loadTemplates();if(which==='staff')loadStaff();if(which==='jobs')loadJobs();if(which==='notice')loadNotices();if(which==='vendors')loadVendors();}
 // ★ 화면 버전: 여기 한 줄만 고침 (GitHub만 올리면 로그인 화면·앱 화면·메뉴에 모두 반영, Code.gs 수정 불필요)
-const UI_VERSION='26.10.23 v5.20 + v3 성능개선';
+const UI_VERSION='26.10.23 v5.21';
 function showVer(){document.querySelectorAll('.verTxt').forEach(x=>x.textContent=UI_VERSION)}
 /** v4.1 ⚙ 마스터 설정: 직원 관리로 바로 이동 (마스터 계정만 보임) */
 function openMaster(){if(!state||!state.isMaster)return;sgo('staff')}
-function display(s){state=s;showVer(s);$('gearBtn').hidden=!s.isMaster;setTimeout(()=>{showBadges(s.badges);startBadges()},0);$('identity').textContent=(s.mode==='STAFF'?'[다이소 담당자로 접속] ':s.mode==='VENDOR'?'[협력업체로 접속] ':'')+'접속 계정: '+s.email+(s.staff?' · 아성다이소 '+s.staff.roleLabel+' '+s.staff.name:'');$('staffTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));$('jobsTab').classList.toggle('hidden',!s.staff);$('noticeTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));if(s.staff&&!s.company&&tab==='my'){$('myTab').textContent='내 업무';}$('adminTab').classList.toggle('hidden',!(['ADMIN','SAFETY'].includes(s.role)||s.isApprover));$('tplTab').classList.toggle('hidden',!['ADMIN','SAFETY'].includes(s.role));$('reviewTab').classList.toggle('hidden',!['ADMIN','SAFETY','CONTRACT'].includes(s.role));if($(tab+'Tab'))$('pageTitle').textContent=$(tab+'Tab').textContent;setupVMenu();setupSMenu();renderMy();}
+function display(s){state=s;setTimeout(perfUI,0);showVer(s);$('gearBtn').hidden=!s.isMaster;setTimeout(()=>{showBadges(s.badges);startBadges()},0);$('identity').textContent=(s.mode==='STAFF'?'[다이소 담당자로 접속] ':s.mode==='VENDOR'?'[협력업체로 접속] ':'')+'접속 계정: '+s.email+(s.staff?' · 아성다이소 '+s.staff.roleLabel+' '+s.staff.name:'');$('staffTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));$('jobsTab').classList.toggle('hidden',!s.staff);$('noticeTab').classList.toggle('hidden',!(s.staff&&s.staff.role==='SAFETY'));if(s.staff&&!s.company&&tab==='my'){$('myTab').textContent='내 업무';}$('adminTab').classList.toggle('hidden',!(['ADMIN','SAFETY'].includes(s.role)||s.isApprover));$('tplTab').classList.toggle('hidden',!['ADMIN','SAFETY'].includes(s.role));$('reviewTab').classList.toggle('hidden',!['ADMIN','SAFETY','CONTRACT'].includes(s.role));if($(tab+'Tab'))$('pageTitle').textContent=$(tab+'Tab').textContent;setupVMenu();setupSMenu();renderMy();}
 /** ☰ 메뉴 열기·닫기 */
 function toggleMenu(open){const d=$('drawer');if(!d)return;const v=open===undefined?!d.classList.contains('open'):!!open;
  /* 닫힌 메뉴 안에 포커스가 남지 않게 (aria-hidden 경고) */if(!v&&d.contains(document.activeElement))document.activeElement.blur();
@@ -492,7 +508,7 @@ const EXEC_OK=/^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/
  *  → 다시 해도 결과가 같은 요청(조회·임시저장·로그인)은 자동으로 2번까지 다시 보냄
  *  → 제출·발행·승인처럼 두 번 하면 안 되는 요청은 다시 보내지 않고 안내만 */
 const RETRY_OK=new Set(['portalData','myStatus','myJobs','vendorJob','jobBoard','meetingDetail','permitList','permitDetail','getPermit','inspList','inspMine','jobEvalList','noticeList','vendorList','staffList','templateAdminList','reviewList','applications','getReviewData','getMeetingPhoto','getInspPhoto','myBadges','saveStep','getMyFile','getInternalFile','getTemplate','saveMeetingDocs',/* v5.19 jobEvalFile은 다시 보내면 ZIP을 처음부터 또 만들어서 뺌 */'setMeetingOpen','confirmAttendee','checkInspections','readNotices','approvePermits','jobEvalList','startRenewal']);
-async function post_(body){if(!EXEC_OK)throw Error('config.js에 Apps Script 주소(/exec)가 등록되지 않았습니다.');
+async function post_(body){const __pt=Date.now(),__name=body.op==='call'?String(body.fn||'call'):String(body.op||'request');let __ok=false;try{if(!EXEC_OK)throw Error('config.js에 Apps Script 주소(/exec)가 등록되지 않았습니다.');
  const again=body.op==='login'||RETRY_OK.has(body.fn);let o,last;
  for(let i=0;i<(again?3:1);i++){if(i)await new Promise(r=>setTimeout(r,800*i));
   /* v5.20 다시 보내도 되는 요청은 45초 넘게 응답이 없으면 끊고 다시 보냄 (응답이 중간에 사라져 끝없이 기다리던 경우) */
@@ -500,7 +516,7 @@ async function post_(body){if(!EXEC_OK)throw Error('config.js에 Apps Script 주
   try{const r=await fetch(CONF.APPS_SCRIPT_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(body),cache:'no-store',signal:ac?ac.signal:undefined});o=await r.json();last=null;break}catch(e){last=e}finally{clearTimeout(tt)}}
  if(!last&&o&&o.ok&&body.op==='call')sessTouch();  // v5.18 쓰는 동안은 이 기기 로그인 유지
  if(last)throw Error(again?'서버 응답을 받지 못했습니다. 잠시 후 다시 시도해 주세요.':'서버 응답을 받지 못했습니다. 처리가 되었을 수 있으니, 화면을 새로 고쳐 결과를 먼저 확인한 뒤 다시 시도해 주세요.');
- if(!o||!o.ok)throw Error((o&&o.error)||'처리에 실패했습니다.');return o.data}
+ if(!o||!o.ok)throw Error((o&&o.error)||'처리에 실패했습니다.'); __ok=true;return o.data}finally{perfRecord('network',__name,Date.now()-__pt,__ok)}}
 /** 로그인 후 서버 기능 호출 (이름은 Code.gs 허용 목록에 있어야 함) */
 async function api(fn,args){try{return await post_({op:'call',fn,key:SESSION,args:args||[]})}catch(e){if(/로그인이 만료|로그인 정보/.test(e.message))setTimeout(()=>logout('로그인이 만료되었습니다. 다시 로그인해 주세요.'),0);throw e}}
 const LOGIN_HELP={VENDOR:'처음 방문한 업체는 로그인 후 사업자 등록을 신청합니다.',STAFF:'회사직원명단에 등록된 개인 Google 계정(Gmail)으로 로그인해 주세요.'};
